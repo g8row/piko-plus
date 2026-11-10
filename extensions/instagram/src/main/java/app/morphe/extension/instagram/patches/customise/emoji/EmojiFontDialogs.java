@@ -10,6 +10,8 @@ import static app.morphe.extension.instagram.utils.IgStr.str;
 
 import android.app.AlertDialog;
 import android.content.Context;
+import android.content.Intent;
+import android.os.Process;
 import android.preference.Preference;
 import android.widget.FrameLayout;
 import android.widget.ProgressBar;
@@ -17,6 +19,7 @@ import android.widget.ProgressBar;
 import app.morphe.extension.crimera.PikoUtils;
 import app.morphe.extension.instagram.patches.customise.emoji.EmojiFontStorage.Source;
 import app.morphe.extension.instagram.settings.preference.widgets.InstagramPreferenceStyle;
+import app.morphe.extension.shared.Logger;
 import app.morphe.extension.shared.Utils;
 
 /** The "Emoji font" setting: pick a font, download it with progress, restart to apply. */
@@ -129,8 +132,26 @@ public final class EmojiFontDialogs {
                 .setTitle(str("piko_emoji_font"))
                 .setMessage(str("piko_emoji_font_restart"))
                 .setNegativeButton(str("piko_emoji_font_later"), null)
-                .setPositiveButton(str("piko_emoji_font_restart_now"),
-                        (d, w) -> Utils.restartApp(Utils.getContext()))
+                .setPositiveButton(str("piko_emoji_font_restart_now"), (d, w) -> restart(context))
                 .show();
+    }
+
+    /**
+     * Relaunches the app and kills the process. Not {@code Utils.restartApp}: that ends in
+     * {@code System.exit}, whose exit hooks (Instagram's crash reporter) can block the main thread
+     * long enough for an ANR. A killed process skips them, and the launch that is already queued
+     * starts the app again in a new process.
+     */
+    private static void restart(Context context) {
+        try {
+            Intent intent = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());
+            if (intent != null) {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                context.startActivity(intent);
+            }
+        } catch (RuntimeException e) {
+            Logger.printException(() -> "Failed to relaunch after the emoji font change", e);
+        }
+        Process.killProcess(Process.myPid());
     }
 }
