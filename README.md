@@ -1,3 +1,23 @@
+# Piko Plus
+
+A fork of [crimera/piko](https://github.com/crimera/piko) that keeps up with upstream `dev` and adds
+Instagram patches that are not part of piko:
+
+- **Conversation notifications**: Android conversation-style DM notifications with history, names,
+  avatars, inline reply, mark as read and share-sheet shortcuts.
+
+Add it to Morphe Manager:
+
+<a href="https://morphe.software/add-source?github=g8row/piko-plus&name=Piko%20Plus">
+  <img src="docs/images/add-to-morphe.svg" alt="Add Piko Plus to Morphe" height="36">
+</a>
+
+Everything below is piko's own README. Upstream changes arrive through a weekly sync PR
+(`.github/workflows/sync-upstream.yml`); releases are made with `.github/workflows/release-plus.yml`.
+Bugs in the extra patches belong here, not in the piko tracker.
+
+---
+
 <div align="center">
 
 <img src="https://socialify.git.ci/crimera/piko/image?forks=1&language=1&name=1&owner=1&pattern=Circuit%20Board&stargazers=1&theme=Auto" alt="piko" width="640" height="320" />

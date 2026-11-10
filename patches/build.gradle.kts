@@ -2,12 +2,12 @@ group = "crimera"
 
 patches {
     about {
-        name = "Piko"
-        description = "Morphe patches focused on Twitter/X"
-        source = "git@github.com:crimera/piko.git"
-        author = "crimera"
+        name = "Piko Plus"
+        description = "Piko with extra Instagram patches (conversation notifications, emoji fonts)"
+        source = "git@github.com:g8row/piko-plus.git"
+        author = "g8row, crimera"
         contact = "na"
-        website = "https://github.com/crimera/piko"
+        website = "https://github.com/g8row/piko-plus"
         license = "GNU General Public License v3.0"
     }
 }

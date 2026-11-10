@@ -1,0 +1,98 @@
+name: Release Piko Plus
+
+# Manual release: builds the .mpp, publishes it as a GitHub release tagged plus-v<version>, and
+# commits patches-bundle.json / patches-list.json to main so Morphe Manager picks it up.
+# Piko Plus has its own version line; upstream's semantic-release workflow (release.yml) is
+# disabled in this repo because it needs upstream's GPG key.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version, e.g. 1.0.0 or 1.1.0-dev.1'
+        required: true
+      prerelease:
+        description: 'Mark as pre-release'
+        type: boolean
+        default: false
+      notes:
+        description: 'Release notes (markdown)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-plus
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Check version
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]] || { echo "Bad version: $VERSION"; exit 1; }
+          if git ls-remote --exit-code --tags origin "refs/tags/plus-v$VERSION" >/dev/null; then
+            echo "Tag plus-v$VERSION already exists"; exit 1
+          fi
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Cache Gradle
+        uses: burrunan/gradle-cache-action@v3
+
+      - name: Build
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ inputs.version }}
+        run: ./gradlew clean buildAndroid generatePatchesList -Pversion="$VERSION"
+
+      - name: Write metadata
+        env:
+          VERSION: ${{ inputs.version }}
+          NOTES: ${{ inputs.notes }}
+          REPO: ${{ github.repository }}
+        run: |
+          ls patches/build/libs/
+          mpp="patches/build/libs/patches-$VERSION.mpp"
+          test -f "$mpp"
+          echo "MPP=$mpp" >> "$GITHUB_ENV"
+          jq --arg v "$VERSION" '.version=$v' patches-list.json > patches-list.json.tmp && mv patches-list.json.tmp patches-list.json
+          jq -n \
+            --arg created "$(date -u +%Y-%m-%dT%H:%M:%S)" \
+            --arg notes "${NOTES:-Piko Plus $VERSION}" \
+            --arg url "https://github.com/$REPO/releases/download/plus-v$VERSION/patches-$VERSION.mpp" \
+            --arg v "$VERSION" \
+            '{created_at: $created, description: $notes, download_url: $url, signature_download_url: "", version: $v}' \
+            > patches-bundle.json
+          cat patches-bundle.json
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+          NOTES: ${{ inputs.notes }}
+          PRERELEASE: ${{ inputs.prerelease }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add patches-bundle.json patches-list.json
+          git commit -m "chore: Release Piko Plus v$VERSION [skip ci]"
+          git tag "plus-v$VERSION"
+          git push origin HEAD:main "plus-v$VERSION"
+          flags=()
+          [ "$PRERELEASE" = true ] && flags+=(--prerelease) || flags+=(--latest)
+          gh release create "plus-v$VERSION" "$MPP" \
+            --title "Piko Plus v$VERSION" --notes "${NOTES:-Piko Plus $VERSION}" "${flags[@]}"
