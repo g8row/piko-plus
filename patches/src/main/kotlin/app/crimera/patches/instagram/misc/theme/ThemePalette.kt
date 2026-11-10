@@ -294,13 +294,41 @@ private val materialYouNightFillOverrides =
         "bds_grey_18" to "piko_dynamic_pressed_background",
     )
 
-internal fun dynamicOverlayMappings(night: Boolean): Map<String, String> {
+/**
+ * Material 3 role colours (Android 14+), matching the system Settings app (piko-plus): pages on
+ * surface_container, cards and buttons on surface_bright, text on on_surface. Older versions keep
+ * the tonal palette aliases above.
+ */
+private fun materialYouRoleAliases(night: Boolean): Map<String, String> {
+    val mode = if (night) "dark" else "light"
+    fun role(name: String) = "@android:color/system_${name}_$mode"
+    return mapOf(
+        "piko_dynamic_background" to role("surface_container"),
+        "piko_dynamic_pressed_background" to role("surface_container_highest"),
+        "piko_dynamic_secondary_container" to role("surface_bright"),
+        "piko_dynamic_secondary_container_pressed" to role(if (night) "outline_variant" else "surface_container_high"),
+        "piko_dynamic_primary" to role("primary"),
+        "piko_dynamic_on_primary" to role("on_primary"),
+        "piko_dynamic_primary_container" to role("primary_container"),
+        "piko_dynamic_on_primary_container" to role("on_primary_container"),
+        "piko_dynamic_on_surface" to role("on_surface"),
+        "piko_dynamic_on_surface_variant" to role("on_surface_variant"),
+        "piko_dynamic_outline" to role("outline"),
+        "piko_dynamic_outline_variant" to role("outline_variant"),
+        "piko_dynamic_ring_seen" to role("outline_variant"),
+        // prism_white is the page in light mode and text in dark; prism_black the reverse.
+        "piko_dynamic_prism_white" to role(if (night) "on_surface" else "surface_container"),
+        "piko_dynamic_prism_black" to role(if (night) "surface_container" else "on_surface"),
+    )
+}
+
+internal fun dynamicOverlayMappings(night: Boolean, api34: Boolean = false): Map<String, String> {
     val aliases =
         if (night) {
             materialYouDarkDynamicAliases + materialYouNeutralConstantsDynamic
         } else {
             materialYouLightDynamicAliases + materialYouNeutralConstantsDynamic
-        }
+        } + (if (api34) materialYouRoleAliases(night) else emptyMap())
 
     return materialYouNamedMappings.mapValues { (name, value) ->
         val alias = materialYouNightFillOverrides[name]?.takeIf { night } ?: value.removePrefix("@color/")

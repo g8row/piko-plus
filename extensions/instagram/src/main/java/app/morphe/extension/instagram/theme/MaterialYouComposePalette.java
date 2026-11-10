@@ -34,74 +34,84 @@ public final class MaterialYouComposePalette {
     private MaterialYouComposePalette() {
     }
 
+    // Material 3 roles (Android 14+) as used by the system Settings app, with tonal fallbacks.
     private static final int[][] LIGHT = {
-            // Surfaces: near-white cards, then the tinted container tone for fields and buttons.
-            {0xfcfcfd, tone("system_accent1_10")},
-            {0xf8f9f9, tone("system_accent2_100")},
-            {0xf3f5f7, tone("system_accent2_100")},
-            {0xf0f2f5, tone("system_accent2_100")},
-            {0xe9edf0, tone("system_accent2_100")},
-            {0xe7eaee, tone("system_accent2_200")},
+            // Cards, fields and buttons sit on surface_bright over the surface_container page.
+            {0xfcfcfd, role("surface_bright_light", "system_accent1_10")},
+            {0xf8f9f9, role("surface_bright_light", "system_accent2_100")},
+            {0xf3f5f7, role("surface_bright_light", "system_accent2_100")},
+            {0xf0f2f5, role("surface_bright_light", "system_accent2_100")},
+            {0xe9edf0, role("surface_container_high_light", "system_accent2_100")},
+            {0xe7eaee, role("surface_container_highest_light", "system_accent2_200")},
             // Dividers, outlines and secondary text.
-            {0xdce0e5, tone("system_neutral2_200")},
-            {0xdbdfe4, tone("system_neutral2_200")},
-            {0xc5cbd3, tone("system_neutral2_300")},
-            {0xa2a9b4, tone("system_neutral2_400")},
-            {0xa2aab4, tone("system_neutral2_400")},
-            {0x838a93, tone("system_neutral2_500")},
-            {0x838993, tone("system_neutral2_500")},
-            {0x686f78, tone("system_neutral2_600")},
-            {0x6f7680, tone("system_neutral2_600")},
-            {0x5e646d, tone("system_neutral2_700")},
-            {0x57606b, tone("system_neutral2_700")},
+            {0xdce0e5, role("outline_variant_light", "system_neutral2_200")},
+            {0xdbdfe4, role("outline_variant_light", "system_neutral2_200")},
+            {0xc5cbd3, role("outline_variant_light", "system_neutral2_300")},
+            {0xa2a9b4, role("outline_light", "system_neutral2_400")},
+            {0xa2aab4, role("outline_light", "system_neutral2_400")},
+            {0x838a93, role("outline_light", "system_neutral2_500")},
+            {0x838993, role("outline_light", "system_neutral2_500")},
+            {0x686f78, role("on_surface_variant_light", "system_neutral2_600")},
+            {0x6f7680, role("on_surface_variant_light", "system_neutral2_600")},
+            {0x5e646d, role("on_surface_variant_light", "system_neutral2_700")},
+            {0x57606b, role("on_surface_variant_light", "system_neutral2_700")},
             // Dark greys are text and icons on a light background.
-            {0x48505b, tone("system_neutral2_800")},
-            {0x363c44, tone("system_neutral1_900")},
-            {0x2b3036, tone("system_neutral1_900")},
-            {0x25292e, tone("system_neutral1_900")},
-            {0x212328, tone("system_neutral1_900")},
-            {0x191c1f, tone("system_neutral1_900")},
-            {0x0c1014, tone("system_neutral1_900")},
+            {0x48505b, role("on_surface_variant_light", "system_neutral2_800")},
+            {0x363c44, role("on_surface_light", "system_neutral1_900")},
+            {0x2b3036, role("on_surface_light", "system_neutral1_900")},
+            {0x25292e, role("on_surface_light", "system_neutral1_900")},
+            {0x212328, role("on_surface_light", "system_neutral1_900")},
+            {0x191c1f, role("on_surface_light", "system_neutral1_900")},
+            {0x0c1014, role("on_surface_light", "system_neutral1_900")},
             // Instagram blue is the primary colour.
-            {0x0095f6, tone("system_accent1_600")},
-            {0x007fe0, tone("system_accent1_600")},
-            {0x0b6ed3, tone("system_accent1_700")},
-            {0x016dcb, tone("system_accent1_700")},
+            {0x0095f6, role("primary_light", "system_accent1_600")},
+            {0x007fe0, role("primary_light", "system_accent1_600")},
+            {0x0b6ed3, role("on_primary_container_light", "system_accent1_700")},
+            {0x016dcb, role("on_primary_container_light", "system_accent1_700")},
     };
 
     private static final int[][] DARK = {
-            // Surfaces and containers, lighter than the neutral1_900 background.
-            {0x0c1014, tone("system_neutral1_900")},
-            {0x191c1f, tone("system_neutral2_900")},
-            {0x212328, tone("system_accent2_800")},
-            {0x25292e, tone("system_accent2_800")},
-            {0x2b3036, tone("system_accent2_800")},
-            {0x363c44, tone("system_accent2_700")},
-            {0x48505b, tone("system_neutral2_700")},
-            {0x57606b, tone("system_neutral2_600")},
-            {0x5e646d, tone("system_neutral2_600")},
+            // Page, then cards and fields on surface_bright like the Settings app.
+            {0x0c1014, role("surface_container_dark", "system_neutral1_900")},
+            {0x191c1f, role("surface_container_high_dark", "system_neutral2_900")},
+            {0x212328, role("surface_bright_dark", "system_accent2_800")},
+            {0x25292e, role("surface_bright_dark", "system_accent2_800")},
+            {0x2b3036, role("surface_bright_dark", "system_accent2_800")},
+            {0x363c44, role("outline_variant_dark", "system_accent2_700")},
+            {0x48505b, role("outline_variant_dark", "system_neutral2_700")},
+            {0x57606b, role("outline_dark", "system_neutral2_600")},
+            {0x5e646d, role("outline_dark", "system_neutral2_600")},
             // Secondary text and icons.
-            {0x686f78, tone("system_neutral2_500")},
-            {0x6f7680, tone("system_neutral2_500")},
-            {0x838a93, tone("system_neutral2_400")},
-            {0x838993, tone("system_neutral2_400")},
-            {0xa2a9b4, tone("system_neutral2_300")},
-            {0xa2aab4, tone("system_neutral2_300")},
-            {0xc5cbd3, tone("system_neutral2_200")},
-            {0xdce0e5, tone("system_neutral2_200")},
-            {0xdbdfe4, tone("system_neutral2_200")},
-            {0xe7eaee, tone("system_neutral2_100")},
-            {0xe9edf0, tone("system_neutral2_100")},
-            {0xf0f2f5, tone("system_neutral2_100")},
+            {0x686f78, role("outline_dark", "system_neutral2_500")},
+            {0x6f7680, role("outline_dark", "system_neutral2_500")},
+            {0x838a93, role("on_surface_variant_dark", "system_neutral2_400")},
+            {0x838993, role("on_surface_variant_dark", "system_neutral2_400")},
+            {0xa2a9b4, role("on_surface_variant_dark", "system_neutral2_300")},
+            {0xa2aab4, role("on_surface_variant_dark", "system_neutral2_300")},
+            {0xc5cbd3, role("on_surface_variant_dark", "system_neutral2_200")},
+            {0xdce0e5, role("on_surface_variant_dark", "system_neutral2_200")},
+            {0xdbdfe4, role("on_surface_variant_dark", "system_neutral2_200")},
+            {0xe7eaee, role("on_surface_dark", "system_neutral2_100")},
+            {0xe9edf0, role("on_surface_dark", "system_neutral2_100")},
+            {0xf0f2f5, role("on_surface_dark", "system_neutral2_100")},
             // Light greys are the text colour on a dark background.
-            {0xf3f5f7, tone("system_neutral1_50")},
-            {0xf8f9f9, tone("system_neutral1_50")},
-            {0xfcfcfd, tone("system_neutral1_50")},
-            {0x0095f6, tone("system_accent1_200")},
-            {0x007fe0, tone("system_accent1_200")},
-            {0x0b6ed3, tone("system_accent1_300")},
-            {0x016dcb, tone("system_accent1_300")},
+            {0xf3f5f7, role("on_surface_dark", "system_neutral1_50")},
+            {0xf8f9f9, role("on_surface_dark", "system_neutral1_50")},
+            {0xfcfcfd, role("on_surface_dark", "system_neutral1_50")},
+            {0x0095f6, role("primary_dark", "system_accent1_200")},
+            {0x007fe0, role("primary_dark", "system_accent1_200")},
+            {0x0b6ed3, role("primary_dark", "system_accent1_300")},
+            {0x016dcb, role("primary_dark", "system_accent1_300")},
     };
+
+    /** A Material 3 role colour on Android 14+, else the tonal palette colour. */
+    private static int role(String role, String fallback) {
+        if (Build.VERSION.SDK_INT >= 34) {
+            int value = tone("system_" + role);
+            if (value != 0) return value;
+        }
+        return tone(fallback);
+    }
 
     private static SparseIntArray lightMap;
     private static SparseIntArray darkMap;
