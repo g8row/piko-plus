@@ -48,8 +48,6 @@ public final class EmojiFont {
                 if (!loaded) {
                     try {
                         typeface = EmojiFontStorage.loadTypeface();
-                        android.util.Log.i("PikoPlus", "emoji font: " + EmojiFontStorage.describe()
-                                + " typeface=" + typeface);
                     } catch (Throwable t) {
                         Logger.printException(() -> "Failed to load the emoji font", t);
                     }
@@ -111,8 +109,20 @@ public final class EmojiFont {
         if (key == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.P || typeface() == null) {
             return key;
         }
-        EmojiFontStorage.Source source = EmojiFontStorage.current();
-        return key + "-piko" + (source == null ? "custom" : source.name().toLowerCase(java.util.Locale.ROOT));
+        return key + imageKeySuffix();
+    }
+
+    private static volatile String imageKeySuffix;
+
+    /** Which font emoji images were drawn in; read from storage once, it only changes on a restart. */
+    private static String imageKeySuffix() {
+        String suffix = imageKeySuffix;
+        if (suffix == null) {
+            EmojiFontStorage.Source source = EmojiFontStorage.current();
+            suffix = "-piko" + (source == null ? "custom" : source.name().toLowerCase(java.util.Locale.ROOT));
+            imageKeySuffix = suffix;
+        }
+        return suffix;
     }
 
     /** Injected into the emoji bitmap disk-cache key builder, so a font change misses old bitmaps. */

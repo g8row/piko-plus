@@ -548,46 +548,6 @@ private fun Document.findColor(name: String): Element? {
     return null
 }
 
-/** Instagram's story ring gradient, in the order GradientPatternStyle lists it. */
-private val stockStoryRingColors =
-    listOf("#ffffd600", "#ffff7a00", "#fffe1d37", "#ffff0169", "#ff7638fa")
-
-/**
- * Points the story ring gradient at piko_ring_* colors (piko-plus). They hold Instagram's own
- * colors, so only the Material You overlay changes the ring; the creation tools keep their
- * palette, which shares the igds_color_gradient_* attributes the ring used to read.
- * Must run before captureApi31Base(), which snapshots every overlay target.
- */
-internal fun addStoryRingColors() {
-    val names = (1..5).map { "piko_ring_$it" }
-    writeColors("res/values", names.zip(stockStoryRingColors).toMap())
-    document("res/values/public.xml").use { document ->
-        names.forEach { document.ensurePublicResource("color", it) }
-    }
-
-    var replacements = 0
-    listOf("res/values/styles.xml", "res/values-night/styles.xml").forEach { path ->
-        if (!resourceFile(path).exists()) return@forEach
-        document(path).use { document ->
-            val styles = document.getElementsByTagName("style")
-            for (index in 0 until styles.length) {
-                val style = styles.item(index) as? Element ?: continue
-                if (style.getAttribute("name") != "GradientPatternStyle") continue
-                val items = style.getElementsByTagName("item")
-                for (itemIndex in 0 until items.length) {
-                    val item = items.item(itemIndex) as? Element ?: continue
-                    val slot = item.getAttribute("name").removePrefix("gradientColor").toIntOrNull()
-                    if (slot != null && slot in 1..5) {
-                        item.textContent = "@color/piko_ring_$slot"
-                        replacements++
-                    }
-                }
-            }
-        }
-    }
-    check(replacements >= 5) { "Unable to find the story ring gradient style" }
-}
-
 /** Theme attributes whose colors Material You replaces, and the tone each one takes. */
 private val retargetedThemeAttributes =
     mapOf(
@@ -607,6 +567,7 @@ private val retargetedThemeAttributes =
  * Must run before captureApi31Base().
  */
 internal fun retargetThemeAttributes() {
+    materialYouRetargetedMappings.clear()
     val created = linkedMapOf<String, String>()
     listOf("res/values/styles.xml", "res/values-night/styles.xml").forEach { path ->
         if (!resourceFile(path).exists()) return@forEach
@@ -625,7 +586,10 @@ internal fun retargetThemeAttributes() {
             }
         }
     }
-    check(created.isNotEmpty()) { "Unable to find the secondary button theme attributes" }
+    if (created.isEmpty()) {
+        println("WARNING: secondary button theme attributes not found, buttons keep Instagram's grey")
+        return
+    }
     writeColors("res/values", created)
     document("res/values/public.xml").use { document ->
         created.keys.forEach { document.ensurePublicResource("color", it) }
@@ -708,34 +672,6 @@ internal fun installStoryRingAndNoteHooks() {
                 invoke-static {p1, v$register}, $MATERIAL_YOU_BUTTONS->noteBubbleColor(Landroid/content/Context;I)I
                 move-result v$register
                 """.trimIndent(),
-            )
-        }
-    }
-}
-
-/** IgdsButton.A01(): picks the painter for the button's style (checks for CustomCTAButton first). */
-private object IgdsButtonApplyStyleFingerprint : app.morphe.patcher.Fingerprint(
-    definingClass = "Lcom/instagram/igds/components/button/IgdsButton;",
-    returnType = "V",
-    parameters = listOf(),
-    custom = { method, _ ->
-        method.implementation?.instructions?.any { instruction ->
-            instruction.opcode == com.android.tools.smali.dexlib2.Opcode.INSTANCE_OF &&
-                (instruction as com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction)
-                    .reference.toString().endsWith("/CustomCTAButton;")
-        } == true
-    },
-)
-
-internal fun installIgdsButtonStyleHook() {
-    IgdsButtonApplyStyleFingerprint.method.apply {
-        val returns = implementation!!.instructions.withIndex()
-            .filter { it.value.opcode == com.android.tools.smali.dexlib2.Opcode.RETURN_VOID }
-            .map { it.index }.reversed()
-        returns.forEach { index ->
-            addInstruction(
-                index,
-                "invoke-static/range {p0 .. p0}, $MATERIAL_YOU_BUTTONS->onStyleApplied(Landroid/view/View;)V",
             )
         }
     }

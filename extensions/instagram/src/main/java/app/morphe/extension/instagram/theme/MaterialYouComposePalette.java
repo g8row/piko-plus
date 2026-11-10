@@ -146,8 +146,6 @@ public final class MaterialYouComposePalette {
      * @param background the Material You background the palette was given.
      */
     public static void remap(Object palette, int background) {
-        android.util.Log.i("PikoPlus", "compose palette remap: " + (palette == null ? null : palette.getClass().getName())
-                + " bg=" + Integer.toHexString(background) + " materialYou=" + MaterialYouTheme.isMaterialYouEnabled());
         if (palette == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.S
                 || !MaterialYouTheme.isMaterialYouEnabled()) {
             return;
@@ -161,12 +159,15 @@ public final class MaterialYouComposePalette {
                     darkMap = build(DARK);
                 }
                 map = dark ? darkMap : lightMap;
+                if (dark && MaterialYouTheme.isAmoledEnabled()) {
+                    // Pure black AMOLED: the page and its near-black surfaces stay black.
+                    map = amoledMap();
+                }
                 if (fieldsClass != palette.getClass()) {
                     colorFields = longFields(palette.getClass());
                     fieldsClass = palette.getClass();
                 }
             }
-            int changed = 0;
             for (Field field : colorFields) {
                 long packed = field.getLong(palette);
                 // sRGB Compose colours keep the colour space id (0) in the low bits.
@@ -177,12 +178,22 @@ public final class MaterialYouComposePalette {
                 if (replacement < 0) continue;
                 long next = ((long) ((alpha << 24) | replacement)) << 32;
                 field.setLong(palette, next);
-                changed++;
             }
-            android.util.Log.i("PikoPlus", "compose palette remap: dark=" + dark + " fields=" + colorFields.size() + " changed=" + changed);
         } catch (Throwable t) {
             Logger.printException(() -> "Failed to apply Material You to a Compose palette", t);
         }
+    }
+
+    private static SparseIntArray amoledMap;
+
+    private static SparseIntArray amoledMap() {
+        if (amoledMap == null) {
+            SparseIntArray map = darkMap.clone();
+            map.put(0x0c1014, 0x000000);
+            map.put(0x191c1f, 0x000000);
+            amoledMap = map;
+        }
+        return amoledMap;
     }
 
     private static List<Field> longFields(Class<?> type) {

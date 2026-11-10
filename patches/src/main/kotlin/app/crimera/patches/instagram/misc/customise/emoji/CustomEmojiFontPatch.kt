@@ -50,19 +50,6 @@ private object EmojiCompatProcessFingerprint : Fingerprint(
     },
 )
 
-/** Emoji.A01(key, emoji): builds "emoji://<key>-api<sdk>//<emoji>", the URL emoji images are cached by. */
-private object EmojiImageUrlFingerprint : Fingerprint(
-    definingClass = "Lcom/instagram/ui/emoji/Emoji;",
-    returnType = "Lcom/instagram/common/typedurl/SimpleImageUrl;",
-    parameters = listOf("Ljava/lang/String;", "Ljava/lang/String;"),
-    filters = listOf(string("-api")),
-)
-
-/** The emoji:// image renderer, which draws each emoji into a bitmap with Canvas.drawText. */
-private object EmojiImageRendererFingerprint : Fingerprint(
-    filters = listOf(string("Malformed emoji URI: ")),
-)
-
 /**
  * The emoji image infra (X.09bz in 452): A01(url, prefix) builds the disk cache key of every emoji
  * bitmap ("emoji_system_<hash>"), single emoji and sprite sheets alike.
@@ -203,37 +190,10 @@ val customEmojiFontPatch =
                 }
             }
 
-            // Emoji drawn as images (reactions, the reaction picker): a different cache key per
-            // font, and the font on the paint the renderer draws with.
-            EmojiImageUrlFingerprint.method.addInstructions(
-                0,
-                """
-                invoke-static/range {p0 .. p0}, $EMOJI_FONT->emojiImageKey(Ljava/lang/String;)Ljava/lang/String;
-                move-result-object p0
-                """.trimIndent(),
-            )
-            EmojiImageRendererFingerprint.method.apply {
-                val calls = findInstructionIndicesReversed {
-                    (opcode == Opcode.INVOKE_VIRTUAL || opcode == Opcode.INVOKE_VIRTUAL_RANGE) &&
-                        getReference<MethodReference>()?.let {
-                            it.name == "setTypeface" && it.parameterTypes.map(CharSequence::toString) == listOf(TYPEFACE)
-                        } == true
-                }
-                if (calls.isEmpty()) throw PatchException("Emoji image renderer sets no typeface")
-                calls.forEach { index ->
-                    val register = instructions.elementAt(index).registersUsed[1]
-                    addInstructions(
-                        index,
-                        """
-                        invoke-static/range {v$register .. v$register}, $EMOJI_FONT->emojiImageTypeface($TYPEFACE)$TYPEFACE
-                        move-result-object v$register
-                        """.trimIndent(),
-                    )
-                }
-            }
-
-            // Both emoji bitmap renderers ask the emoji infra's provider for a typeface (null for
-            // the system font). The providers are the classes its factory method instantiates.
+            // Emoji drawn as images (reactions, the reaction picker, the emoji keyboard) go through
+            // the emoji infra: its key builder names the cached bitmaps, so the font goes into the
+            // key, and both bitmap renderers ask its provider for a typeface (null for the system
+            // font). The providers are the classes its factory method instantiates.
             EmojiImageCacheKeyFingerprint.method.apply {
                 findInstructionIndicesReversed { opcode == Opcode.RETURN_OBJECT }.forEach { index ->
                     val register = (instructions.elementAt(index) as com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction).registerA

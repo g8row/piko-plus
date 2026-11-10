@@ -13,7 +13,6 @@ import android.os.Build;
 import android.widget.TextView;
 
 import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 
 import app.morphe.extension.shared.Logger;
 
@@ -28,7 +27,6 @@ public final class MaterialYouButtons {
     private MaterialYouButtons() {
     }
 
-    private static boolean logged;
 
     /**
      * Injected at the end of the SECONDARY painter's A04(Resources, TextView). The painter fills
@@ -48,26 +46,16 @@ public final class MaterialYouButtons {
             int stale = paint.getColor();
             int color = themeColor(context, "igds_color_secondary_button_panavision");
             if (color == 0 || (color | 0xff000000) == (stale | 0xff000000)) {
-                int id = context.getResources().getIdentifier(
-                        "piko_dynamic_secondary_container", "color", context.getPackageName());
+                int id = id(context, "piko_dynamic_secondary_container", "color");
                 if (id == 0) return;
                 color = context.getColor(id);
             }
-            for (Class<?> c = painter.getClass(); c != null && c != Object.class; c = c.getSuperclass()) {
-                for (Field field : c.getDeclaredFields()) {
-                    if (field.getType() != android.content.res.ColorStateList.class
-                            || java.lang.reflect.Modifier.isStatic(field.getModifiers())) continue;
-                    field.setAccessible(true);
-                    android.content.res.ColorStateList list = (android.content.res.ColorStateList) field.get(painter);
-                    if (list != null && list.getDefaultColor() == stale) {
-                        field.set(painter, android.content.res.ColorStateList.valueOf(color));
-                    }
+            for (Field field : painterFields(painter.getClass())) {
+                if (field.getType() != android.content.res.ColorStateList.class) continue;
+                android.content.res.ColorStateList list = (android.content.res.ColorStateList) field.get(painter);
+                if (list != null && list.getDefaultColor() == stale) {
+                    field.set(painter, android.content.res.ColorStateList.valueOf(color));
                 }
-            }
-            if (!logged) {
-                logged = true;
-                android.util.Log.i("PikoPlus", "secondary button fill " + Integer.toHexString(stale)
-                        + " -> " + Integer.toHexString(color));
             }
             int alpha = paint.getAlpha();
             paint.setColor(color);
@@ -97,7 +85,7 @@ public final class MaterialYouButtons {
                 case "igds_color_gradient_lavender": ring = "piko_dynamic_ring_5"; break;
                 default: return hex;
             }
-            int id = context.getResources().getIdentifier(ring, "color", context.getPackageName());
+            int id = id(context, ring, "color");
             if (id == 0) return hex;
             return Integer.toHexString(systemTone(context, ring, context.getColor(id)));
         } catch (Throwable t) {
@@ -122,7 +110,7 @@ public final class MaterialYouButtons {
             case "piko_dynamic_ring_5": tone = night ? "system_accent1_400" : "system_accent1_700"; break;
             default: return fallback;
         }
-        int id = context.getResources().getIdentifier(tone, "color", "android");
+        int id = id(context, tone, "color");
         return id == 0 ? fallback : context.getColor(id);
     }
 
@@ -141,8 +129,7 @@ public final class MaterialYouButtons {
                     && color != themeColor(context, "igds_color_elevated_highlight_background")) {
                 return color;
             }
-            int id = context.getResources().getIdentifier(
-                    "piko_dynamic_secondary_container", "color", context.getPackageName());
+            int id = id(context, "piko_dynamic_secondary_container", "color");
             return id == 0 ? color : context.getColor(id);
         } catch (Throwable t) {
             Logger.printException(() -> "Failed to theme a note bubble", t);
@@ -150,73 +137,58 @@ public final class MaterialYouButtons {
         }
     }
 
+    private static final java.util.Map<String, Integer> ids = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** Resource ids by type and name, looked up once: getIdentifier is a string search. */
+    private static int id(Context context, String name, String type) {
+        String key = type + "/" + name;
+        Integer cached = ids.get(key);
+        if (cached != null) return cached;
+        String pkg = name.startsWith("system_") ? "android" : context.getPackageName();
+        int id = context.getResources().getIdentifier(name, type, pkg);
+        ids.put(key, id);
+        return id;
+    }
+
     private static int themeColor(Context context, String attribute) {
-        int attr = context.getResources().getIdentifier(attribute, "attr", context.getPackageName());
+        int attr = id(context, attribute, "attr");
         if (attr == 0) return 0;
         android.util.TypedValue value = new android.util.TypedValue();
         if (!context.getTheme().resolveAttribute(attr, value, true)) return 0;
         return value.resourceId != 0 ? context.getColor(value.resourceId) : value.data;
     }
 
-    private static Method getStyleMethod;
-    private static final java.util.Set<String> loggedStyles = new java.util.HashSet<>();
+    private static final java.util.Map<Class<?>, Field[]> painterFields = new java.util.concurrent.ConcurrentHashMap<>();
 
-    /**
-     * Injected at the end of IgdsButton.A01(), where every button style picks its painter. A
-     * painter whose fill is the theme's secondary button grey gets the container tone, whichever
-     * painter class the style uses.
-     */
-    public static void onStyleApplied(android.view.View button) {
-        if (button == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.S
-                || !MaterialYouTheme.isMaterialYouEnabled()) {
-            return;
-        }
-        try {
-            Object painter = null;
-            for (Class<?> c = button.getClass(); c != null && painter == null; c = c.getSuperclass()) {
-                if (!c.getName().equals("com.instagram.igds.components.button.IgdsButton")) continue;
-                for (Field field : c.getDeclaredFields()) {
-                    if (java.lang.reflect.Modifier.isStatic(field.getModifiers())) continue;
+    /** The painter's Paint field first, then its ColorStateList fields; reflected once per class. */
+    private static Field[] painterFields(Class<?> type) {
+        Field[] cached = painterFields.get(type);
+        if (cached != null) return cached;
+        java.util.List<Field> paints = new java.util.ArrayList<>();
+        java.util.List<Field> lists = new java.util.ArrayList<>();
+        for (Class<?> c = type; c != null && c != Object.class; c = c.getSuperclass()) {
+            for (Field field : c.getDeclaredFields()) {
+                if (java.lang.reflect.Modifier.isStatic(field.getModifiers())) continue;
+                if (field.getType() == Paint.class) {
                     field.setAccessible(true);
-                    Object value = field.get(button);
-                    if (value != null && paintOf(value) != null) {
-                        painter = value;
-                        break;
-                    }
+                    paints.add(field);
+                } else if (field.getType() == android.content.res.ColorStateList.class) {
+                    field.setAccessible(true);
+                    lists.add(field);
                 }
             }
-            if (painter == null) return;
-            Paint paint = paintOf(painter);
-            Context context = button.getContext();
-            int grey = themeColor(context, "igds_color_secondary_button_panavision");
-            if (getStyleMethod == null) getStyleMethod = button.getClass().getMethod("getStyle");
-            Object style = getStyleMethod.invoke(button);
-            String key = style + "/" + painter.getClass().getName();
-            if (loggedStyles.add(key)) {
-                android.util.Log.i("PikoPlus", "IgdsButton style=" + key + " fill="
-                        + Integer.toHexString(paint.getColor()) + " themeGrey=" + Integer.toHexString(grey));
-            }
-            if ((paint.getColor() | 0xff000000) != (grey | 0xff000000)) return;
-            int id = context.getResources().getIdentifier(
-                    "piko_dynamic_secondary_container", "color", context.getPackageName());
-            if (id == 0) return;
-            int alpha = paint.getAlpha();
-            paint.setColor(context.getColor(id));
-            paint.setAlpha(alpha);
-            button.invalidate();
-        } catch (Throwable t) {
-            Logger.printException(() -> "Failed to theme an IgdsButton", t);
         }
+        paints.addAll(lists);
+        Field[] fields = paints.toArray(new Field[0]);
+        painterFields.put(type, fields);
+        return fields;
     }
 
     private static Paint paintOf(Object painter) throws IllegalAccessException {
-        for (Class<?> c = painter.getClass(); c != null && c != Object.class; c = c.getSuperclass()) {
-            for (Field field : c.getDeclaredFields()) {
-                if (field.getType() == Paint.class && !java.lang.reflect.Modifier.isStatic(field.getModifiers())) {
-                    field.setAccessible(true);
-                    Object value = field.get(painter);
-                    if (value != null) return (Paint) value;
-                }
+        for (Field field : painterFields(painter.getClass())) {
+            if (field.getType() == Paint.class) {
+                Object value = field.get(painter);
+                if (value != null) return (Paint) value;
             }
         }
         return null;

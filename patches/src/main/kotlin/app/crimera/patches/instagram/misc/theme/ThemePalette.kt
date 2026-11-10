@@ -245,16 +245,11 @@ internal val amoledSurfaceBaselineMappings =
         }
         .mapValues { "@color/bds_black" }
 
-// Story ring gradient, through the piko_ring_* colors the ring style points at (piko-plus).
-internal val materialYouStoryRingMappings =
-    (1..5).associate { "piko_ring_$it" to "@color/piko_dynamic_ring_$it" }
-
 /** Theme attributes moved onto their own colors at patch time, see retargetThemeAttributes (piko-plus). */
 internal val materialYouRetargetedMappings = linkedMapOf<String, String>()
 
 internal val materialYouNamedMappings get() =
     materialYouRetargetedMappings +
-    materialYouStoryRingMappings +
         materialYouBaseMappings +
         materialYouAccentMappings +
         materialYouThemeMappings +
