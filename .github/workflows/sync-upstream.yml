@@ -70,6 +70,7 @@ jobs:
         if: steps.merge.outputs.result == 'merged' || steps.merge.outputs.result == 'conflict'
         env:
           GH_TOKEN: ${{ secrets.SYNC_TOKEN || github.token }}
+          GH_REPO: ${{ github.repository }}
           RESULT: ${{ steps.merge.outputs.result }}
           BEHIND: ${{ steps.merge.outputs.behind }}
         run: |

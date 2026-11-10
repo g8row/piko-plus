@@ -82,6 +82,7 @@ jobs:
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           VERSION: ${{ inputs.version }}
           NOTES: ${{ inputs.notes }}
           PRERELEASE: ${{ inputs.prerelease }}
