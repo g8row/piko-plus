@@ -10,13 +10,13 @@ import app.crimera.patches.instagram.entity.directItem.directItemEntity
 import app.crimera.patches.instagram.entity.mediadata.mediaDataEntity
 import app.crimera.patches.instagram.entity.userdata.userDataEntity
 import app.crimera.patches.instagram.misc.dm.saveMessages.DirectItemDbHideFingerprint
-import app.crimera.patches.instagram.misc.dm.saveMessages.hookParsedDirectItems
-import app.crimera.patches.instagram.misc.dm.saveMessages.hookRealtimeDirectItems
 import app.crimera.patches.instagram.misc.dm.saveMessages.UserCacheIdMapFingerprint
 import app.crimera.patches.instagram.misc.dm.saveMessages.UserCacheInstanceFingerprint
-import app.crimera.patches.instagram.misc.dm.saveMessages.userCacheLookupFingerprint
+import app.crimera.patches.instagram.misc.dm.saveMessages.hookParsedDirectItems
+import app.crimera.patches.instagram.misc.dm.saveMessages.hookRealtimeDirectItems
 import app.crimera.patches.instagram.misc.dm.saveMessages.hookThreadFields
 import app.crimera.patches.instagram.misc.dm.saveMessages.hookThreadUsers
+import app.crimera.patches.instagram.misc.dm.saveMessages.userCacheLookupFingerprint
 import app.crimera.patches.instagram.misc.extension.hooks.instagramInitHook
 import app.crimera.patches.instagram.misc.extension.sharedExtensionPatch
 import app.crimera.patches.instagram.misc.ghostMode.DMSeenFingerprint
@@ -24,7 +24,6 @@ import app.crimera.patches.instagram.utils.Constants.COMPATIBILITY_INSTAGRAM
 import app.crimera.patches.instagram.utils.Constants.PATCHES_DESCRIPTOR
 import app.crimera.patches.instagram.utils.Constants.USER_SESSION_CLASS
 import app.crimera.patches.instagram.utils.enableSettings
-import app.crimera.patches.instagram.utils.fieldReference
 import app.crimera.utils.changeString
 import app.morphe.patcher.Fingerprint
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
@@ -33,7 +32,6 @@ import app.morphe.patcher.extensions.InstructionExtensions.instructions
 import app.morphe.patcher.extensions.InstructionExtensions.removeInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
 import app.morphe.patcher.methodCall
-import app.morphe.patcher.patch.BytecodePatchContext
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.booleanOption
 import app.morphe.patcher.patch.bytecodePatch
@@ -204,7 +202,6 @@ private object LegacySeenSinkFingerprint : Fingerprint(
  * the order of the payload's schema, so the order of its string field writes names them. Null,
  * with nothing changed, when the decoder is not found or does not have the expected shape.
  */
-context(patchContext: BytecodePatchContext)
 private fun hookPayloadDecoder(decoder: Fingerprint, hook: String, fieldIndexes: List<Int>): String? {
     val method = decoder.matchOrNull()?.method ?: return null
     val instructions = method.instructions.toList()

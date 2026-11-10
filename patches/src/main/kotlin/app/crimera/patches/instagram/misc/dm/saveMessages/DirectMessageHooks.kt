@@ -10,8 +10,8 @@ import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
 import app.morphe.patcher.extensions.InstructionExtensions.instructions
 import app.morphe.patcher.fieldAccess
-import app.morphe.patcher.patch.BytecodePatchContext
 import app.morphe.patcher.patch.PatchException
+import app.morphe.patcher.patch.classDefBy
 import app.morphe.patcher.util.getFreeRegisterProvider
 import app.morphe.patcher.util.getReference
 import app.morphe.util.addInstructionsAtControlFlowLabel
@@ -28,7 +28,6 @@ import com.android.tools.smali.dexlib2.iface.reference.StringReference
  * Calls [hookMethod], which takes the item as an Object, with every DirectItem parsed from
  * REST/JSON. Injected at the return of the parser.
  */
-context(patchContext: BytecodePatchContext)
 internal fun hookParsedDirectItems(hookMethod: String) {
     DirectItemJsonParserFingerprint.let {
         val returnObject = it.instructionMatches.last()
@@ -48,12 +47,11 @@ internal fun hookParsedDirectItems(hookMethod: String) {
  *
  * @return The name of the delta's thread id field, for messages that do not carry their thread.
  */
-context(patchContext: BytecodePatchContext)
 internal fun hookRealtimeDirectItems(hookMethod: String): String {
     val postprocess = DirectItemPostprocessFingerprint.method
     val deltaType = postprocess.parameterTypes[1].toString()
     val deltaStringFields =
-        patchContext.classDefBy(deltaType)
+        classDefBy(deltaType)
             .fields.filter { field ->
                 field.type == "Ljava/lang/String;" &&
                     !AccessFlags.STATIC.isSet(field.accessFlags)
@@ -73,7 +71,6 @@ internal fun hookRealtimeDirectItems(hookMethod: String): String {
  * Calls [hookMethod], which takes a List, with the participants Instagram parses for a thread.
  * Optional, so nothing is hooked when the dispatch is not found.
  */
-context(patchContext: BytecodePatchContext)
 internal fun hookThreadUsers(hookMethod: String, threadHookMethod: String? = null) {
     ThreadUsersDispatchFingerprint.matchOrNull()?.let { match ->
         match.method.apply {
@@ -121,7 +118,6 @@ internal fun hookThreadUsers(hookMethod: String, threadHookMethod: String? = nul
  * field, so each hook sees the thread object it belongs to. Optional: nothing is hooked when the
  * parser or a field write is not found.
  */
-context(patchContext: BytecodePatchContext)
 internal fun hookThreadFields(idHook: String, imageHook: String): Boolean {
     val method = ThreadUsersDispatchFingerprint.matchOrNull()?.method ?: return false
     method.apply {

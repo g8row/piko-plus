@@ -12,7 +12,6 @@ import app.crimera.utils.classNameToExtension
 import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
 import app.morphe.patcher.fieldAccess
 import app.morphe.patcher.methodCall
-import app.morphe.patcher.patch.BytecodePatchContext
 import app.morphe.patcher.patch.classDefBy
 import app.morphe.patcher.patch.patch
 import app.morphe.patcher.util.getReference
@@ -31,9 +30,8 @@ private const val GIF_URL_HELPER_CLASS = "Lcom/instagram/model/mediasize/GifUrlI
  * The GifUrlImpl String field the JSON writer reads just before it writes [key]. Its parser fills
  * the object through a constructor, so the writer is the only place a field meets its key.
  */
-context(patchContext: BytecodePatchContext)
 private fun gifUrlField(key: String): String {
-    for (method in patchContext.classDefBy(GIF_URL_HELPER_CLASS).methods) {
+    for (method in classDefBy(GIF_URL_HELPER_CLASS).methods) {
         val instructions = method.implementation?.instructions?.toList() ?: continue
         stringFieldBeforeKey(instructions, GIF_URL_CLASS, key)?.let { return it }
     }
