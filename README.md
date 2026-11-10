@@ -5,6 +5,11 @@ Instagram patches that are not part of piko:
 
 - **Conversation notifications**: Android conversation-style DM notifications with history, names,
   avatars, inline reply, mark as read and share-sheet shortcuts.
+- **Custom emoji font**: download Apple, Google Noto, Twemoji or Microsoft Fluent emoji from
+  Piko settings > Font, used in text, text fields, reactions and the emoji keyboard.
+- **Material You, extended**: the theme follows the system Settings colours (Material 3 roles on
+  Android 14+) and also covers Compose screens, secondary buttons, story rings, note bubbles and
+  dark-mode surfaces.
 
 Add it to Morphe Manager:
 
