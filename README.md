@@ -9,7 +9,7 @@ Instagram patches that are not part of piko:
 Add it to Morphe Manager:
 
 <a href="https://morphe.software/add-source?github=g8row/piko-plus&name=Piko%20Plus">
-  <img src="docs/images/add-to-morphe.svg" alt="Add Piko Plus to Morphe" height="36">
+  <img src="docs/images/add-to-morphe.svg" alt="Add Piko Plus to Morphe" height="48">
 </a>
 
 Everything below is piko's own README. Upstream changes arrive through a weekly sync PR
@@ -85,7 +85,7 @@ To patch with Twitter/X version 11.88 to 12.4, you must include patches from ano
 ## ⚙️ Patch Details
 
 <!-- PATCHES_START -->
-> **[v3.11.1-dev.1](https://github.com/crimera/piko/releases/tag/v3.11.1-dev.1)**&nbsp;&nbsp;•&nbsp;&nbsp;`dev`&nbsp;&nbsp;•&nbsp;&nbsp;141 patches total
+> **[v3.11.1](https://github.com/crimera/piko/releases/tag/v3.11.1)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;141 patches total
 <details>
 <summary>📦 Twitter&nbsp;&nbsp;•&nbsp;&nbsp;75 patches</summary>
 <br>
