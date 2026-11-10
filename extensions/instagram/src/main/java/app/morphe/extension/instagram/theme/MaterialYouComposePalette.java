@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2026 piko-plus <https://github.com/g8row/piko-plus>
+ * Copyright (C) 2026 piko <https://github.com/crimera/piko>
  *
  * See the included NOTICE file for GPLv3 §7(b) terms that apply to this code.
  */

@@ -1,12 +1,15 @@
 /*
- * Copyright (C) 2026 piko-plus <https://github.com/g8row/piko-plus>
+ * Copyright (C) 2026 piko <https://github.com/crimera/piko>
  *
  * See the included NOTICE file for GPLv3 §7(b) terms that apply to this code.
  */
 
 package app.morphe.extension.instagram.patches.customise.emoji;
 
+import android.content.Context;
 import android.graphics.Typeface;
+import android.net.Uri;
+import android.os.Build;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -24,9 +27,10 @@ import app.morphe.extension.shared.Logger;
 import app.morphe.extension.shared.Utils;
 
 /**
- * The downloaded emoji font: one file in the app's private storage, plus a small file naming which
- * {@link Source} it came from. Downloads go to a temporary file that only replaces the current font
- * once it is complete and loads as a font, so a failed or cancelled download leaves the old one.
+ * The emoji font: one file in the app's private storage, downloaded from a {@link Source} or imported
+ * from a file the user picks, plus a small file naming where it came from. Both go to a temporary
+ * file that only replaces the current font once it is complete and loads as a font, so a failed or
+ * cancelled download or import leaves the old one.
  */
 public final class EmojiFontStorage {
 
@@ -35,6 +39,7 @@ public final class EmojiFontStorage {
 
     /** Fonts that can be downloaded. All are CBDT colour bitmap fonts, which Android can draw. */
     public enum Source {
+        // Piko Plus only: an unofficial build of Apple's font, for personal use.
         APPLE("Apple", 116,
                 "https://github.com/samuelngs/apple-emoji-ttf/releases/latest/download/AppleColorEmoji-Linux.ttf"),
         NOTO("Google Noto", 11,
@@ -62,7 +67,10 @@ public final class EmojiFontStorage {
         boolean isCancelled();
     }
 
-    public enum Result {DONE, CANCELLED, NOT_A_FONT, FAILED}
+    public enum Result {DONE, CANCELLED, NOT_A_FONT, TOO_LARGE, FAILED}
+
+    /** What the source file says for a font imported from storage. */
+    private static final String IMPORTED = "IMPORTED";
 
     private static final String FILE_NAME = "piko_emoji_font.ttf";
     private static final String SOURCE_FILE_NAME = "piko_emoji_font.source";
@@ -86,32 +94,43 @@ public final class EmojiFontStorage {
         return file.isFile() && file.length() > 0;
     }
 
-    /** The source of the stored font, or null when there is none. */
+    /** The source of the stored font, or null when there is none or it was imported from a file. */
     public static Source current() {
-        if (!hasFont()) {
-            return null;
-        }
         try {
-            String name = new String(Files.readAllBytes(sourceFile().toPath()), StandardCharsets.UTF_8).trim();
-            return Source.valueOf(name);
+            return Source.valueOf(currentName());
         } catch (Exception e) {
             return null;
         }
     }
 
-    static String describe() {
-        File file = file();
-        return file + " exists=" + file.exists() + " bytes=" + file.length() + " source=" + current();
+    /** Whether the stored font was imported from a file rather than downloaded. */
+    public static boolean isImported() {
+        return IMPORTED.equals(currentName());
+    }
+
+    private static String currentName() {
+        if (!hasFont()) {
+            return null;
+        }
+        try {
+            return new String(Files.readAllBytes(sourceFile().toPath()), StandardCharsets.UTF_8).trim();
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     /**
      * The font as a custom fallback family. Minikin always picks a custom fallback family that has
      * the glyph; a plain typeface loses emoji to the system emoji font, which is tagged as an emoji
-     * font (und-Zsye) and wins font selection for emoji even inside a span.
+     * font (und-Zsye) and wins font selection for emoji even inside a span. Custom fallback families
+     * need Android 10; Android 9 gets the plain typeface, which works where no system emoji font wins.
      */
     static Typeface loadTypeface() {
         if (!hasFont()) {
             return null;
+        }
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            return parse(file());
         }
         try {
             android.graphics.fonts.Font font = new android.graphics.fonts.Font.Builder(file()).build();
@@ -125,46 +144,80 @@ public final class EmojiFontStorage {
 
     /** Removes the stored font; the system emoji are back after a restart. */
     public static boolean delete() {
-        Source previous = current();
+        String previous = currentName();
         boolean deleted = !file().exists() || file().delete();
         sourceFile().delete();
         if (deleted) {
-            SettingsRestart.markChanged(RESTART_KEY, RestartPolicy.REQUIRED, name(previous), null);
+            SettingsRestart.markChanged(RESTART_KEY, RestartPolicy.REQUIRED, previous, null);
         }
         return deleted;
     }
 
     /** Downloads a font, blocking; call off the main thread. */
     public static Result download(Source source, Progress progress) {
-        File temp = new File(dir(), FILE_NAME + ".part");
         HttpURLConnection connection = null;
         try {
             connection = open(source.url);
             long total = connection.getContentLengthLong();
             if (total > MAX_SIZE_BYTES) {
+                return Result.TOO_LARGE;
+            }
+            try (InputStream in = connection.getInputStream()) {
+                return install(in, total, progress, source.name());
+            }
+        } catch (Exception e) {
+            Logger.printException(() -> "Failed to download the emoji font " + source.name(), e);
+            return Result.FAILED;
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
+            }
+        }
+    }
+
+    /** Imports a font file the user picked, blocking; call off the main thread. */
+    public static Result importFrom(Context context, Uri uri) {
+        try (InputStream in = context.getContentResolver().openInputStream(uri)) {
+            if (in == null) {
                 return Result.FAILED;
             }
-            try (InputStream in = connection.getInputStream();
-                 OutputStream out = new FileOutputStream(temp)) {
+            return install(in, -1, null, IMPORTED);
+        } catch (Exception e) {
+            Logger.printException(() -> "Failed to import the emoji font", e);
+            return Result.FAILED;
+        }
+    }
+
+    /**
+     * Copies a font into place: to a temporary file first, which replaces the stored font only
+     * once it is complete and loads as a font.
+     */
+    private static Result install(InputStream in, long total, Progress progress, String sourceName)
+            throws IOException {
+        File temp = new File(dir(), FILE_NAME + ".part");
+        try {
+            try (OutputStream out = new FileOutputStream(temp)) {
                 byte[] buffer = new byte[64 * 1024];
                 long done = 0;
                 long lastReport = 0;
                 int read;
                 while ((read = in.read(buffer)) != -1) {
-                    if (progress.isCancelled()) {
+                    if (progress != null && progress.isCancelled()) {
                         return Result.CANCELLED;
                     }
                     out.write(buffer, 0, read);
                     done += read;
                     if (done > MAX_SIZE_BYTES) {
-                        return Result.FAILED;
+                        return Result.TOO_LARGE;
                     }
-                    if (done - lastReport > 256 * 1024) {
+                    if (progress != null && done - lastReport > 256 * 1024) {
                         lastReport = done;
                         progress.onProgress(done, total);
                     }
                 }
-                progress.onProgress(done, total);
+                if (progress != null) {
+                    progress.onProgress(done, total);
+                }
                 if (total > 0 && done != total) {
                     throw new IOException("Download ended early: " + done + " of " + total);
                 }
@@ -174,22 +227,18 @@ public final class EmojiFontStorage {
                 return Result.NOT_A_FONT;
             }
 
-            Source previous = current();
+            String previous = currentName();
             if (!temp.renameTo(file())) {
                 throw new IOException("Could not move the emoji font into place");
             }
             try (OutputStream out = new FileOutputStream(sourceFile())) {
-                out.write(source.name().getBytes(StandardCharsets.UTF_8));
+                out.write(sourceName.getBytes(StandardCharsets.UTF_8));
             }
-            SettingsRestart.markChanged(RESTART_KEY, RestartPolicy.REQUIRED, name(previous), source.name());
+            // An imported file can replace another one, so it never counts as unchanged.
+            SettingsRestart.markChanged(RESTART_KEY, RestartPolicy.REQUIRED, previous,
+                    IMPORTED.equals(sourceName) ? IMPORTED + System.currentTimeMillis() : sourceName);
             return Result.DONE;
-        } catch (Exception e) {
-            Logger.printException(() -> "Failed to download the emoji font " + source.name(), e);
-            return Result.FAILED;
         } finally {
-            if (connection != null) {
-                connection.disconnect();
-            }
             if (temp.exists()) {
                 temp.delete();
             }
@@ -203,7 +252,7 @@ public final class EmojiFontStorage {
             connection.setInstanceFollowRedirects(false);
             connection.setConnectTimeout(15_000);
             connection.setReadTimeout(30_000);
-            connection.setRequestProperty("User-Agent", "piko-plus");
+            connection.setRequestProperty("User-Agent", "piko");
             int code = connection.getResponseCode();
             if (code >= 300 && code < 400) {
                 String location = connection.getHeaderField("Location");
@@ -221,10 +270,6 @@ public final class EmojiFontStorage {
             return connection;
         }
         throw new IOException("Too many redirects");
-    }
-
-    private static String name(Source source) {
-        return source == null ? null : source.name();
     }
 
     private static boolean isFontHeader(File file) {

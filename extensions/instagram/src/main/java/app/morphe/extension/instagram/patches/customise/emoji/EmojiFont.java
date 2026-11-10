@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2026 piko-plus <https://github.com/g8row/piko-plus>
+ * Copyright (C) 2026 piko <https://github.com/crimera/piko>
  *
  * See the included NOTICE file for GPLv3 §7(b) terms that apply to this code.
  */
@@ -15,16 +15,21 @@ import android.text.StaticLayout;
 import android.text.TextPaint;
 import android.text.style.TypefaceSpan;
 
+import androidx.annotation.RequiresApi;
+
+import java.util.Locale;
+
 import app.morphe.extension.shared.Logger;
 
 /**
  * Draws emoji in a downloaded emoji font instead of the system one.
  *
  * Emoji are drawn by whatever typeface the paint holds, so the font is attached to the emoji runs of
- * the text itself, as spans, at the two places Instagram's text passes on its way to the screen:
- * EmojiCompat's process step, which every AppCompat text view, text field and Compose text runs, and
- * {@code StaticLayout.Builder.obtain}, which the app's custom text views (captions, comments) use to
- * lay out text themselves. With no font downloaded both hooks hand the text back untouched.
+ * the text itself, as spans, where Instagram's text passes on its way to the screen: EmojiCompat's
+ * process step (AppCompat text views, text fields, Compose text), the app's own platform TextView
+ * subclasses, and {@code StaticLayout.Builder.obtain}, which custom text views (captions, comments)
+ * use to lay out text themselves. Emoji drawn as bitmaps (reactions) get the font through the emoji
+ * image infra. With no font downloaded every hook hands its value back untouched.
  */
 public final class EmojiFont {
 
@@ -35,6 +40,7 @@ public final class EmojiFont {
     private static Typeface typeface;
 
     /** Marks the spans this class adds, so text processed twice does not collect duplicates. */
+    @RequiresApi(Build.VERSION_CODES.P)
     private static final class EmojiTypefaceSpan extends TypefaceSpan {
         EmojiTypefaceSpan(Typeface typeface) {
             super(typeface);
@@ -93,8 +99,9 @@ public final class EmojiFont {
     }
 
     /**
-     * Injected before the emoji image renderer sets its paint's typeface. Reactions, the reaction
-     * picker and other emoji images are drawn into bitmaps there, not laid out as text.
+     * Wraps the typeface the emoji image infra hands its bitmap renderers (null for the system
+     * font). Reactions, the reaction picker and other emoji images are drawn into bitmaps, not
+     * laid out as text.
      */
     public static Typeface emojiImageTypeface(Typeface original) {
         Typeface font = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P ? typeface() : null;
@@ -102,10 +109,10 @@ public final class EmojiFont {
     }
 
     /**
-     * Injected into the emoji image URL builder. The rendered bitmaps are cached by URL, so the
-     * font is made part of it; otherwise images drawn in the previous font keep being served.
+     * Injected into the emoji bitmap disk-cache key builder. The font is made part of the key;
+     * otherwise bitmaps drawn in the previous font keep being served after a change.
      */
-    public static String emojiImageKey(String key) {
+    public static String emojiImageCacheKey(String key) {
         if (key == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.P || typeface() == null) {
             return key;
         }
@@ -119,15 +126,10 @@ public final class EmojiFont {
         String suffix = imageKeySuffix;
         if (suffix == null) {
             EmojiFontStorage.Source source = EmojiFontStorage.current();
-            suffix = "-piko" + (source == null ? "custom" : source.name().toLowerCase(java.util.Locale.ROOT));
+            suffix = "-piko" + (source == null ? "custom" : source.name().toLowerCase(Locale.ROOT));
             imageKeySuffix = suffix;
         }
         return suffix;
-    }
-
-    /** Injected into the emoji bitmap disk-cache key builder, so a font change misses old bitmaps. */
-    public static String emojiImageCacheKey(String key) {
-        return emojiImageKey(key);
     }
 
     /** Injected into the app's text fields: spans the emoji of the text being edited, in place. */
@@ -166,6 +168,7 @@ public final class EmojiFont {
                 && ((Spanned) text).nextSpanTransition(0, text.length(), EmojiTypefaceSpan.class) < text.length();
     }
 
+    @RequiresApi(Build.VERSION_CODES.P)
     private static void addSpans(Spannable text, int from, Typeface font) {
         int length = text.length();
         int i = from;

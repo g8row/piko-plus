@@ -62,6 +62,6 @@ public class EmojiFontTest {
 
     @Test
     public void flag() {
-        assertEquals("[🇧🇬]", runs("from 🇧🇬!"));
+        assertEquals("[🇯🇵]", runs("from 🇯🇵!"));
     }
 }

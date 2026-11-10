@@ -245,7 +245,7 @@ internal val amoledSurfaceBaselineMappings =
         }
         .mapValues { "@color/bds_black" }
 
-/** Theme attributes moved onto their own colors at patch time, see retargetThemeAttributes (piko-plus). */
+/** Theme attributes moved onto their own colors at patch time, see retargetThemeAttributes. */
 internal val materialYouRetargetedMappings = linkedMapOf<String, String>()
 
 internal val materialYouNamedMappings get() =
@@ -279,7 +279,7 @@ internal val amoledSplashMappings =
 /**
  * Dark greys Instagram uses as fills in dark mode (secondary buttons, cards, dividers, the
  * highlight ring) but which the shared mappings send to the background colour, where they vanish.
- * Night only: in light mode the same colours are text and icons (piko-plus).
+ * Night only: in light mode the same colours are text and icons.
  */
 private val materialYouNightFillOverrides =
     mapOf(
@@ -290,7 +290,7 @@ private val materialYouNightFillOverrides =
     )
 
 /**
- * Material 3 role colours (Android 14+), matching the system Settings app (piko-plus): pages on
+ * Material 3 role colours (Android 14+), matching the system Settings app: pages on
  * surface_container, cards and buttons on surface_bright, text on on_surface. Older versions keep
  * the tonal palette aliases above.
  */

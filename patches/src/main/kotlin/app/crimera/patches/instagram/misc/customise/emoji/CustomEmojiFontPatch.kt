@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2026 piko-plus <https://github.com/g8row/piko-plus>
+ * Copyright (C) 2026 piko <https://github.com/crimera/piko>
  *
  * See the included NOTICE file for GPLv3 §7(b) terms that apply to this code.
  */
@@ -18,22 +18,24 @@ import app.morphe.patcher.methodCall
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.classDefForEach
 import app.morphe.patcher.patch.mutableClassDefBy
-import app.morphe.patcher.util.proxy.mutableTypes.MutableClass
-import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod
-import app.morphe.patcher.util.smali.toInstruction
-import com.android.tools.smali.dexlib2.builder.MethodImplementationBuilder
-import com.android.tools.smali.dexlib2.iface.ClassDef
-import com.android.tools.smali.dexlib2.immutable.ImmutableMethod
-import com.android.tools.smali.dexlib2.immutable.ImmutableMethodParameter
 import app.morphe.patcher.patch.patch
 import app.morphe.patcher.string
 import app.morphe.patcher.util.getReference
+import app.morphe.patcher.util.proxy.mutableTypes.MutableClass
+import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod
 import app.morphe.patcher.util.registersUsed
+import app.morphe.patcher.util.smali.toInstruction
 import app.morphe.util.findInstructionIndicesReversed
 import com.android.tools.smali.dexlib2.AccessFlags
 import com.android.tools.smali.dexlib2.Opcode
+import com.android.tools.smali.dexlib2.builder.MethodImplementationBuilder
+import com.android.tools.smali.dexlib2.iface.ClassDef
 import com.android.tools.smali.dexlib2.iface.instruction.Instruction
+import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
+import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
+import com.android.tools.smali.dexlib2.immutable.ImmutableMethod
+import com.android.tools.smali.dexlib2.immutable.ImmutableMethodParameter
 
 private const val EMOJI_FONT = "$PATCHES_DESCRIPTOR/customise/emoji/EmojiFont;"
 private const val STATIC_LAYOUT_BUILDER = "Landroid/text/StaticLayout\$Builder;"
@@ -73,7 +75,6 @@ private fun Instruction.isObtainCall() =
         getReference<MethodReference>()?.let {
             it.definingClass == STATIC_LAYOUT_BUILDER && it.name == "obtain"
         } == true
-
 
 private val TEXT_VIEWS = setOf(
     "Landroid/widget/TextView;",
@@ -156,7 +157,7 @@ private fun MutableClass.hookTextChanges() {
 val customEmojiFontPatch =
     patch(
         name = "Custom emoji font",
-        description = "Adds an option to download an emoji font (Apple, Noto, Twemoji, Fluent) and draw emoji in it.",
+        description = "Adds an option to download an emoji font (Apple, Noto, Twemoji, Fluent) or import one and draw emoji in it.",
     ) {
         compatibleWith(COMPATIBILITY_INSTAGRAM)
         dependsOn(settingsPatch)
@@ -196,7 +197,7 @@ val customEmojiFontPatch =
             // font). The providers are the classes its factory method instantiates.
             EmojiImageCacheKeyFingerprint.method.apply {
                 findInstructionIndicesReversed { opcode == Opcode.RETURN_OBJECT }.forEach { index ->
-                    val register = (instructions.elementAt(index) as com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction).registerA
+                    val register = (instructions.elementAt(index) as OneRegisterInstruction).registerA
                     addInstructions(
                         index,
                         """
@@ -212,7 +213,7 @@ val customEmojiFontPatch =
                 .flatMap { method ->
                     method.implementation?.instructions.orEmpty()
                         .filter { it.opcode == Opcode.NEW_INSTANCE }
-                        .mapNotNull { (it as com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction).reference.toString() }
+                        .mapNotNull { (it as ReferenceInstruction).reference.toString() }
                 }
                 .distinct()
             var providers = 0
@@ -222,7 +223,7 @@ val customEmojiFontPatch =
                     .filter { it.returnType == TYPEFACE && it.parameterTypes.map(CharSequence::toString) == listOf("Ljava/lang/String;") }
                     .forEach { method ->
                         method.findInstructionIndicesReversed { opcode == Opcode.RETURN_OBJECT }.forEach { index ->
-                            val register = (method.instructions.elementAt(index) as com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction).registerA
+                            val register = (method.instructions.elementAt(index) as OneRegisterInstruction).registerA
                             method.addInstructions(
                                 index,
                                 """

@@ -6,9 +6,6 @@
 
 package app.crimera.patches.instagram.misc.theme
 
-import app.morphe.patcher.patch.mutableClassDefBy
-import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
-import app.morphe.patcher.extensions.InstructionExtensions.addInstruction
 import app.morphe.patcher.patch.document
 import app.morphe.patcher.patch.packageMetadata
 import app.morphe.patcher.patch.resourceFile
@@ -559,7 +556,7 @@ private val retargetedThemeAttributes =
     )
 
 /**
- * Gives each listed theme attribute its own color (piko-plus). The colors Instagram points these
+ * Gives each listed theme attribute its own color. The colors Instagram points these
  * attributes at (fds_gray_95_deprecated, bds_grey_9...) are shared with many other surfaces, and
  * bds_grey_9 already follows the background, so remapping them would either miss the buttons or
  * hide them. Each style item is pointed at a new color that references the one it used, keeping
@@ -593,86 +590,5 @@ internal fun retargetThemeAttributes() {
     writeColors("res/values", created)
     document("res/values/public.xml").use { document ->
         created.keys.forEach { document.ensurePublicResource("color", it) }
-    }
-}
-
-/**
- * The painter of SECONDARY IgdsButtons (X.0DhX in 452). A04(Resources, TextView) fills its Paint
- * from ?igds_color_secondary_button_panavision; the literal is the text alpha key it passes on.
- */
-private object SecondaryButtonPainterFingerprint : app.morphe.patcher.Fingerprint(
-    returnType = "V",
-    parameters = listOf("Landroid/content/res/Resources;", "Landroid/widget/TextView;"),
-    filters = listOf(app.morphe.patcher.literal(-873711542)),
-)
-
-internal fun installSecondaryButtonTint() {
-    SecondaryButtonPainterFingerprint.method.apply {
-        val returnIndex = implementation!!.instructions.indexOfLast {
-            it.opcode == com.android.tools.smali.dexlib2.Opcode.RETURN_VOID
-        }
-        addInstruction(
-            returnIndex,
-            "invoke-static/range {p0 .. p2}, Lapp/morphe/extension/instagram/theme/MaterialYouButtons;" +
-                "->onSecondaryPainter(Ljava/lang/Object;Landroid/content/res/Resources;Landroid/widget/TextView;)V",
-        )
-    }
-}
-
-private const val MATERIAL_YOU_BUTTONS = "Lapp/morphe/extension/instagram/theme/MaterialYouButtons;"
-
-/** X.05iJ.A00(String, String): builds a RingSpecImpl. Its class also resolves the ring colours. */
-private object StoryRingSpecFingerprint : app.morphe.patcher.Fingerprint(
-    returnType = "Lcom/instagram/api/schemas/RingSpecImpl;",
-    parameters = listOf("Ljava/lang/String;", "Ljava/lang/String;"),
-)
-
-/** NoteBubbleView.A0E(Context): the bubble fill colour. */
-private object NoteBubbleColorFingerprint : app.morphe.patcher.Fingerprint(
-    definingClass = "Lcom/instagram/direct/inbox/notes/ui/NoteBubbleView;",
-    returnType = "I",
-    parameters = listOf("Landroid/content/Context;"),
-)
-
-/** Story ring gradient and note bubble fills (piko-plus). */
-internal fun installStoryRingAndNoteHooks() {
-    val ringClass = StoryRingSpecFingerprint.classDef
-    val resolver = mutableClassDefBy(ringClass).methods.single {
-        com.android.tools.smali.dexlib2.AccessFlags.STATIC.isSet(it.accessFlags) &&
-            it.returnType == "Ljava/lang/String;" &&
-            it.parameterTypes.map(CharSequence::toString) == listOf("I", "I")
-    }
-    resolver.apply {
-        val returns = implementation!!.instructions.withIndex()
-            .filter { it.value.opcode == com.android.tools.smali.dexlib2.Opcode.RETURN_OBJECT }
-            .map { it.index }.reversed()
-        returns.forEach { index ->
-            val register = (implementation!!.instructions.elementAt(index)
-                as com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction).registerA
-            addInstructions(
-                index,
-                """
-                invoke-static {p0, p1, v$register}, $MATERIAL_YOU_BUTTONS->ringColor(IILjava/lang/String;)Ljava/lang/String;
-                move-result-object v$register
-                """.trimIndent(),
-            )
-        }
-    }
-
-    NoteBubbleColorFingerprint.method.apply {
-        val returns = implementation!!.instructions.withIndex()
-            .filter { it.value.opcode == com.android.tools.smali.dexlib2.Opcode.RETURN }
-            .map { it.index }.reversed()
-        returns.forEach { index ->
-            val register = (implementation!!.instructions.elementAt(index)
-                as com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction).registerA
-            addInstructions(
-                index,
-                """
-                invoke-static {p1, v$register}, $MATERIAL_YOU_BUTTONS->noteBubbleColor(Landroid/content/Context;I)I
-                move-result v$register
-                """.trimIndent(),
-            )
-        }
     }
 }

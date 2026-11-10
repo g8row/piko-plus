@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2026 piko-plus <https://github.com/g8row/piko-plus>
+ * Copyright (C) 2026 piko <https://github.com/crimera/piko>
  *
  * See the included NOTICE file for GPLv3 §7(b) terms that apply to this code.
  */
@@ -10,35 +10,69 @@ import static app.morphe.extension.instagram.utils.IgStr.str;
 
 import android.app.AlertDialog;
 import android.content.Context;
-import android.content.Intent;
-import android.os.Process;
+import android.net.Uri;
 import android.preference.Preference;
 import android.widget.FrameLayout;
 import android.widget.ProgressBar;
 
 import app.morphe.extension.crimera.PikoUtils;
 import app.morphe.extension.instagram.patches.customise.emoji.EmojiFontStorage.Source;
+import app.morphe.extension.instagram.settings.ActivityHook;
 import app.morphe.extension.instagram.settings.preference.widgets.InstagramPreferenceStyle;
-import app.morphe.extension.shared.Logger;
 import app.morphe.extension.shared.Utils;
 
-/** The "Emoji font" setting: pick a font, download it with progress, restart to apply. */
+/**
+ * The "Emoji font" setting: pick a font and download it with progress, or import a font file. The change is registered with
+ * {@code SettingsRestart}, so leaving the settings offers the usual restart.
+ */
 public final class EmojiFontDialogs {
 
     private EmojiFontDialogs() {
     }
 
+    /** The file picker key, handled by {@code ActivityHook} and {@code RestorePrefFragment}. */
+    public static final String IMPORT_KEY = "piko_pref_add_emoji_font";
+
+    /** Imports a picked file off the main thread and reports how it went. */
+    public static void importFile(Context context, Uri uri, Runnable done) {
+        Utils.runOnBackgroundThread(() -> {
+            EmojiFontStorage.Result result = EmojiFontStorage.importFrom(context, uri);
+            Utils.runOnMainThread(() -> {
+                switch (result) {
+                    case DONE:
+                        PikoUtils.toast(str("piko_pref_add_font_success"));
+                        break;
+                    case NOT_A_FONT:
+                        PikoUtils.toast(str("piko_pref_add_font_invalid"));
+                        break;
+                    case TOO_LARGE:
+                        PikoUtils.toast(str("piko_pref_add_font_too_large"));
+                        break;
+                    default:
+                        PikoUtils.toast(str("piko_pref_add_font_fail"));
+                        break;
+                }
+                done.run();
+            });
+        });
+    }
+
     public static String summary() {
+        if (EmojiFontStorage.isImported()) {
+            return str("piko_emoji_font_imported");
+        }
         Source current = EmojiFontStorage.current();
         return current == null ? str("piko_emoji_font_system") : current.label;
     }
 
     public static void show(Context context, Preference preference) {
         Source[] sources = Source.values();
-        String[] labels = new String[sources.length + 1];
+        // System default, the downloadable fonts, then importing a file.
+        String[] labels = new String[sources.length + 2];
         labels[0] = str("piko_emoji_font_system");
+        labels[labels.length - 1] = str("piko_emoji_font_import");
         Source current = EmojiFontStorage.current();
-        int checked = 0;
+        int checked = EmojiFontStorage.isImported() ? labels.length - 1 : 0;
         for (int i = 0; i < sources.length; i++) {
             labels[i + 1] = sources[i].label + "  (" + sources[i].approximateMegabytes + " MB)";
             if (sources[i] == current) {
@@ -54,8 +88,10 @@ public final class EmojiFontDialogs {
                         if (EmojiFontStorage.hasFont()) {
                             EmojiFontStorage.delete();
                             preference.setSummary(summary());
-                            askRestart(context);
                         }
+                    } else if (which == labels.length - 1) {
+                        // The same picker as Add font; RestorePrefFragment hands the file back here.
+                        ActivityHook.launchFragment(context, IMPORT_KEY);
                     } else {
                         download(context, preference, sources[which - 1]);
                     }
@@ -112,11 +148,11 @@ public final class EmojiFontDialogs {
                 switch (result) {
                     case DONE:
                         preference.setSummary(summary());
-                        askRestart(context);
                         break;
                     case NOT_A_FONT:
                         PikoUtils.toast(str("piko_emoji_font_invalid"));
                         break;
+                    case TOO_LARGE:
                     case FAILED:
                         PikoUtils.toast(str("piko_emoji_font_failed"));
                         break;
@@ -125,33 +161,5 @@ public final class EmojiFontDialogs {
                 }
             });
         });
-    }
-
-    private static void askRestart(Context context) {
-        new AlertDialog.Builder(InstagramPreferenceStyle.dialogContext(context))
-                .setTitle(str("piko_emoji_font"))
-                .setMessage(str("piko_emoji_font_restart"))
-                .setNegativeButton(str("piko_emoji_font_later"), null)
-                .setPositiveButton(str("piko_emoji_font_restart_now"), (d, w) -> restart(context))
-                .show();
-    }
-
-    /**
-     * Relaunches the app and kills the process. Not {@code Utils.restartApp}: that ends in
-     * {@code System.exit}, whose exit hooks (Instagram's crash reporter) can block the main thread
-     * long enough for an ANR. A killed process skips them, and the launch that is already queued
-     * starts the app again in a new process.
-     */
-    private static void restart(Context context) {
-        try {
-            Intent intent = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());
-            if (intent != null) {
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-                context.startActivity(intent);
-            }
-        } catch (RuntimeException e) {
-            Logger.printException(() -> "Failed to relaunch after the emoji font change", e);
-        }
-        Process.killProcess(Process.myPid());
     }
 }

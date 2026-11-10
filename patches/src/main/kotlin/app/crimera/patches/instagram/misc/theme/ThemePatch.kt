@@ -63,7 +63,7 @@ val themePatch =
 
             enableSettings("theme")
             installComposePrismBlackRuntime(legacyAmoled = amoled == true)
-            // piko-plus hooks are optional: a newer Instagram that moves one of them keeps the rest.
+            // Component hooks are optional: a newer Instagram that moves one of them keeps the rest.
             listOf(
                 "secondary button fill" to ::installSecondaryButtonTint,
                 "story ring and note bubble colours" to ::installStoryRingAndNoteHooks,

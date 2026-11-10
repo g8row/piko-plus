@@ -157,7 +157,7 @@ internal fun createComposePrismColorBridge(
                         "iput-wide v0, v2, $backgroundField".toInstruction(),
                     )
                 }
-                // piko-plus: theme the rest of the palette (buttons, fields, secondary text).
+                // Material You: theme the rest of the palette (buttons, fields, secondary text).
                 addInstruction(
                     "invoke-static {v2, v5}, $COMPOSE_PALETTE_REMAP".toInstruction(),
                 )
