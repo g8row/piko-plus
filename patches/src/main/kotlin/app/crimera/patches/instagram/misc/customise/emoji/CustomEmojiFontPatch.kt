@@ -16,6 +16,15 @@ import app.morphe.patcher.extensions.InstructionExtensions.instructions
 import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
 import app.morphe.patcher.methodCall
 import app.morphe.patcher.patch.PatchException
+import app.morphe.patcher.patch.classDefForEach
+import app.morphe.patcher.patch.mutableClassDefBy
+import app.morphe.patcher.util.proxy.mutableTypes.MutableClass
+import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod
+import app.morphe.patcher.util.smali.toInstruction
+import com.android.tools.smali.dexlib2.builder.MethodImplementationBuilder
+import com.android.tools.smali.dexlib2.iface.ClassDef
+import com.android.tools.smali.dexlib2.immutable.ImmutableMethod
+import com.android.tools.smali.dexlib2.immutable.ImmutableMethodParameter
 import app.morphe.patcher.patch.patch
 import app.morphe.patcher.string
 import app.morphe.patcher.util.getReference
@@ -41,6 +50,29 @@ private object EmojiCompatProcessFingerprint : Fingerprint(
     },
 )
 
+/** Emoji.A01(key, emoji): builds "emoji://<key>-api<sdk>//<emoji>", the URL emoji images are cached by. */
+private object EmojiImageUrlFingerprint : Fingerprint(
+    definingClass = "Lcom/instagram/ui/emoji/Emoji;",
+    returnType = "Lcom/instagram/common/typedurl/SimpleImageUrl;",
+    parameters = listOf("Ljava/lang/String;", "Ljava/lang/String;"),
+    filters = listOf(string("-api")),
+)
+
+/** The emoji:// image renderer, which draws each emoji into a bitmap with Canvas.drawText. */
+private object EmojiImageRendererFingerprint : Fingerprint(
+    filters = listOf(string("Malformed emoji URI: ")),
+)
+
+/**
+ * The emoji image infra (X.09bz in 452): A01(url, prefix) builds the disk cache key of every emoji
+ * bitmap ("emoji_system_<hash>"), single emoji and sprite sheets alike.
+ */
+private object EmojiImageCacheKeyFingerprint : Fingerprint(
+    returnType = "Ljava/lang/String;",
+    parameters = listOf("Ljava/lang/String;", "Ljava/lang/String;"),
+    filters = listOf(string("fbnotopart_")),
+)
+
 /** Every app method that lays text out itself through StaticLayout.Builder.obtain. */
 private object StaticLayoutObtainFingerprint : Fingerprint(
     filters = listOf(
@@ -54,6 +86,84 @@ private fun Instruction.isObtainCall() =
         getReference<MethodReference>()?.let {
             it.definingClass == STATIC_LAYOUT_BUILDER && it.name == "obtain"
         } == true
+
+
+private val TEXT_VIEWS = setOf(
+    "Landroid/widget/TextView;",
+    "Landroid/widget/Button;",
+    "Landroid/widget/CheckedTextView;",
+)
+private val EDIT_TEXTS = setOf(
+    "Landroid/widget/EditText;",
+    "Landroid/widget/AutoCompleteTextView;",
+    "Landroid/widget/MultiAutoCompleteTextView;",
+)
+private const val CHAR_SEQUENCE = "Ljava/lang/CharSequence;"
+private const val TYPEFACE = "Landroid/graphics/Typeface;"
+private const val BUFFER_TYPE = "Landroid/widget/TextView\$BufferType;"
+
+private fun MutableClass.findMethod(name: String, parameters: List<String>) =
+    methods.firstOrNull { method ->
+        method.name == name && method.returnType == "V" &&
+            method.parameterTypes.map(CharSequence::toString) == parameters
+    }
+
+private fun MutableClass.addMethod(name: String, parameters: List<String>, accessFlags: Int, registers: Int,
+                                   body: MethodImplementationBuilder.() -> Unit) {
+    val implementation = MethodImplementationBuilder(registers).apply(body).methodImplementation
+    methods.add(
+        MutableMethod(
+            ImmutableMethod(
+                type, name, parameters.map { ImmutableMethodParameter(it, null, null) },
+                "V", accessFlags, emptySet(), emptySet(), implementation,
+            ),
+        ),
+    )
+}
+
+/**
+ * Instagram's own text views (IgTextView, IgEditText...) extend the platform classes, not AppCompat,
+ * so EmojiCompat never sees their text. Every text they are given passes through setText.
+ */
+private fun MutableClass.hookSetText() {
+    val parameters = listOf(CHAR_SEQUENCE, BUFFER_TYPE)
+    val existing = findMethod("setText", parameters)
+    if (existing != null) {
+        existing.implementation ?: return
+        existing.addInstructions(
+            0,
+            """
+            invoke-static/range {p1 .. p1}, $EMOJI_FONT->process($CHAR_SEQUENCE)$CHAR_SEQUENCE
+            move-result-object p1
+            """.trimIndent(),
+        )
+        return
+    }
+    // Registers: v0 this, v1 text, v2 buffer type.
+    addMethod("setText", parameters, AccessFlags.PUBLIC.value, 3) {
+        addInstruction("invoke-static {v1}, $EMOJI_FONT->process($CHAR_SEQUENCE)$CHAR_SEQUENCE".toInstruction())
+        addInstruction("move-result-object v1".toInstruction())
+        addInstruction("invoke-super {v0, v1, v2}, $superclass->setText($CHAR_SEQUENCE$BUFFER_TYPE)V".toInstruction())
+        addInstruction("return-void".toInstruction())
+    }
+}
+
+/** Typing never calls setText, so text fields also re-span their text on every change. */
+private fun MutableClass.hookTextChanges() {
+    val parameters = listOf(CHAR_SEQUENCE, "I", "I", "I")
+    val existing = findMethod("onTextChanged", parameters)
+    if (existing != null) {
+        existing.implementation ?: return
+        existing.addInstructions(0, "invoke-static/range {p1 .. p1}, $EMOJI_FONT->onTextChanged($CHAR_SEQUENCE)V")
+        return
+    }
+    // Registers: v0 this, v1 text, v2-v4 the ints.
+    addMethod("onTextChanged", parameters, AccessFlags.PROTECTED.value, 5) {
+        addInstruction("invoke-static {v1}, $EMOJI_FONT->onTextChanged($CHAR_SEQUENCE)V".toInstruction())
+        addInstruction("invoke-super {v0, v1, v2, v3, v4}, $superclass->onTextChanged(${CHAR_SEQUENCE}III)V".toInstruction())
+        addInstruction("return-void".toInstruction())
+    }
+}
 
 @Suppress("unused")
 val customEmojiFontPatch =
@@ -90,6 +200,96 @@ val customEmojiFontPatch =
                         }
                         replaceInstruction(index, "$call, $EMOJI_FONT->obtain$OBTAIN_SIGNATURE")
                     }
+                }
+            }
+
+            // Emoji drawn as images (reactions, the reaction picker): a different cache key per
+            // font, and the font on the paint the renderer draws with.
+            EmojiImageUrlFingerprint.method.addInstructions(
+                0,
+                """
+                invoke-static/range {p0 .. p0}, $EMOJI_FONT->emojiImageKey(Ljava/lang/String;)Ljava/lang/String;
+                move-result-object p0
+                """.trimIndent(),
+            )
+            EmojiImageRendererFingerprint.method.apply {
+                val calls = findInstructionIndicesReversed {
+                    (opcode == Opcode.INVOKE_VIRTUAL || opcode == Opcode.INVOKE_VIRTUAL_RANGE) &&
+                        getReference<MethodReference>()?.let {
+                            it.name == "setTypeface" && it.parameterTypes.map(CharSequence::toString) == listOf(TYPEFACE)
+                        } == true
+                }
+                if (calls.isEmpty()) throw PatchException("Emoji image renderer sets no typeface")
+                calls.forEach { index ->
+                    val register = instructions.elementAt(index).registersUsed[1]
+                    addInstructions(
+                        index,
+                        """
+                        invoke-static/range {v$register .. v$register}, $EMOJI_FONT->emojiImageTypeface($TYPEFACE)$TYPEFACE
+                        move-result-object v$register
+                        """.trimIndent(),
+                    )
+                }
+            }
+
+            // Both emoji bitmap renderers ask the emoji infra's provider for a typeface (null for
+            // the system font). The providers are the classes its factory method instantiates.
+            EmojiImageCacheKeyFingerprint.method.apply {
+                findInstructionIndicesReversed { opcode == Opcode.RETURN_OBJECT }.forEach { index ->
+                    val register = (instructions.elementAt(index) as com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction).registerA
+                    addInstructions(
+                        index,
+                        """
+                        invoke-static/range {v$register .. v$register}, $EMOJI_FONT->emojiImageCacheKey(Ljava/lang/String;)Ljava/lang/String;
+                        move-result-object v$register
+                        """.trimIndent(),
+                    )
+                }
+            }
+            val infra = EmojiImageCacheKeyFingerprint.classDef
+            val providerTypes = infra.methods
+                .filter { AccessFlags.STATIC.isSet(it.accessFlags) && it.parameterTypes.isEmpty() && it.returnType.startsWith("L") }
+                .flatMap { method ->
+                    method.implementation?.instructions.orEmpty()
+                        .filter { it.opcode == Opcode.NEW_INSTANCE }
+                        .mapNotNull { (it as com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction).reference.toString() }
+                }
+                .distinct()
+            var providers = 0
+            providerTypes.forEach { type ->
+                val provider = mutableClassDefBy(type)
+                provider.methods
+                    .filter { it.returnType == TYPEFACE && it.parameterTypes.map(CharSequence::toString) == listOf("Ljava/lang/String;") }
+                    .forEach { method ->
+                        method.findInstructionIndicesReversed { opcode == Opcode.RETURN_OBJECT }.forEach { index ->
+                            val register = (method.instructions.elementAt(index) as com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction).registerA
+                            method.addInstructions(
+                                index,
+                                """
+                                invoke-static/range {v$register .. v$register}, $EMOJI_FONT->emojiImageTypeface($TYPEFACE)$TYPEFACE
+                                move-result-object v$register
+                                """.trimIndent(),
+                            )
+                        }
+                        providers++
+                    }
+            }
+            if (providers == 0) throw PatchException("No emoji typeface providers found in ${infra.type}")
+
+            // The app's own TextView and EditText subclasses.
+            val textViews = mutableListOf<ClassDef>()
+            classDefForEach { classDef ->
+                if ((classDef.superclass in TEXT_VIEWS || classDef.superclass in EDIT_TEXTS) &&
+                    !classDef.type.startsWith("Lapp/morphe/")
+                ) {
+                    textViews += classDef
+                }
+            }
+            if (textViews.isEmpty()) throw PatchException("No TextView subclasses found")
+            textViews.forEach { classDef ->
+                mutableClassDefBy(classDef).apply {
+                    hookSetText()
+                    if (superclass in EDIT_TEXTS) hookTextChanges()
                 }
             }
 

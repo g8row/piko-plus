@@ -48,6 +48,8 @@ public final class EmojiFont {
                 if (!loaded) {
                     try {
                         typeface = EmojiFontStorage.loadTypeface();
+                        android.util.Log.i("PikoPlus", "emoji font: " + EmojiFontStorage.describe()
+                                + " typeface=" + typeface);
                     } catch (Throwable t) {
                         Logger.printException(() -> "Failed to load the emoji font", t);
                     }
@@ -89,6 +91,39 @@ public final class EmojiFont {
         } catch (Throwable t) {
             Logger.printException(() -> "Failed to apply the emoji font", t);
             return text;
+        }
+    }
+
+    /**
+     * Injected before the emoji image renderer sets its paint's typeface. Reactions, the reaction
+     * picker and other emoji images are drawn into bitmaps there, not laid out as text.
+     */
+    public static Typeface emojiImageTypeface(Typeface original) {
+        Typeface font = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P ? typeface() : null;
+        return font != null ? font : original;
+    }
+
+    /**
+     * Injected into the emoji image URL builder. The rendered bitmaps are cached by URL, so the
+     * font is made part of it; otherwise images drawn in the previous font keep being served.
+     */
+    public static String emojiImageKey(String key) {
+        if (key == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.P || typeface() == null) {
+            return key;
+        }
+        EmojiFontStorage.Source source = EmojiFontStorage.current();
+        return key + "-piko" + (source == null ? "custom" : source.name().toLowerCase(java.util.Locale.ROOT));
+    }
+
+    /** Injected into the emoji bitmap disk-cache key builder, so a font change misses old bitmaps. */
+    public static String emojiImageCacheKey(String key) {
+        return emojiImageKey(key);
+    }
+
+    /** Injected into the app's text fields: spans the emoji of the text being edited, in place. */
+    public static void onTextChanged(CharSequence text) {
+        if (text instanceof Spannable) {
+            process(text);
         }
     }
 

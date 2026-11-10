@@ -43,6 +43,8 @@ val themePatch =
         )
 
         execute {
+            addStoryRingColors()
+            retargetThemeAttributes()
             val originalApi31Base = captureApi31Base()
 
             forceWhiteOnMediaChrome()
@@ -62,6 +64,9 @@ val themePatch =
 
             enableSettings("theme")
             installComposePrismBlackRuntime(legacyAmoled = amoled == true)
+            installSecondaryButtonTint()
+            installStoryRingAndNoteHooks()
+            installIgdsButtonStyleHook()
             installSystemDefaultUiModeHook()
             installThemeLifecycleHooks()
             installNativeThemeModeSync()

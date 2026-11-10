@@ -23,6 +23,14 @@ internal val amoledSwitchMappings =
 // Static fallbacks used when Android dynamic colors are unavailable.
 internal val materialYouLightFallbackAliases =
     mapOf(
+        "piko_dynamic_secondary_container" to "#ffdae2f9",
+        "piko_dynamic_secondary_container_pressed" to "#ffbec6dc",
+        "piko_dynamic_ring_seen" to "#ffc4c6d0",
+        "piko_dynamic_ring_1" to "#ffb58fd0",
+        "piko_dynamic_ring_2" to "#ff8b5fb0",
+        "piko_dynamic_ring_3" to "#ff6f86c8",
+        "piko_dynamic_ring_4" to "#ff4f67ab",
+        "piko_dynamic_ring_5" to "#ff2f468c",
         "piko_dynamic_primary" to "#ff4557a5",
         "piko_dynamic_primary_pressed" to "#ff36468c",
         "piko_dynamic_primary_container" to "#ffdde1ff",
@@ -41,6 +49,14 @@ internal val materialYouLightFallbackAliases =
 
 internal val materialYouDarkFallbackAliases =
     mapOf(
+        "piko_dynamic_secondary_container" to "#ff3e4759",
+        "piko_dynamic_secondary_container_pressed" to "#ff565f71",
+        "piko_dynamic_ring_seen" to "#ff44474e",
+        "piko_dynamic_ring_1" to "#ffeadcff",
+        "piko_dynamic_ring_2" to "#ffd3bbff",
+        "piko_dynamic_ring_3" to "#ffb7c6ff",
+        "piko_dynamic_ring_4" to "#ff9caeff",
+        "piko_dynamic_ring_5" to "#ff8197f0",
         "piko_dynamic_primary" to "#ff8ea0ff",
         "piko_dynamic_primary_pressed" to "#ffc0c7ff",
         "piko_dynamic_primary_container" to "#ff31448f",
@@ -59,6 +75,14 @@ internal val materialYouDarkFallbackAliases =
 
 private val materialYouLightDynamicAliases =
     mapOf(
+        "piko_dynamic_secondary_container" to "@android:color/system_accent2_100",
+        "piko_dynamic_secondary_container_pressed" to "@android:color/system_accent2_200",
+        "piko_dynamic_ring_seen" to "@android:color/system_neutral2_200",
+        "piko_dynamic_ring_1" to "@android:color/system_accent3_300",
+        "piko_dynamic_ring_2" to "@android:color/system_accent3_500",
+        "piko_dynamic_ring_3" to "@android:color/system_accent1_400",
+        "piko_dynamic_ring_4" to "@android:color/system_accent1_500",
+        "piko_dynamic_ring_5" to "@android:color/system_accent1_700",
         "piko_dynamic_primary" to "@android:color/system_accent1_600",
         "piko_dynamic_primary_pressed" to "@android:color/system_accent1_700",
         "piko_dynamic_primary_container" to "@android:color/system_accent1_100",
@@ -77,6 +101,14 @@ private val materialYouLightDynamicAliases =
 
 private val materialYouDarkDynamicAliases =
     mapOf(
+        "piko_dynamic_secondary_container" to "@android:color/system_accent2_800",
+        "piko_dynamic_secondary_container_pressed" to "@android:color/system_accent2_700",
+        "piko_dynamic_ring_seen" to "@android:color/system_neutral2_700",
+        "piko_dynamic_ring_1" to "@android:color/system_accent3_100",
+        "piko_dynamic_ring_2" to "@android:color/system_accent3_200",
+        "piko_dynamic_ring_3" to "@android:color/system_accent1_200",
+        "piko_dynamic_ring_4" to "@android:color/system_accent1_300",
+        "piko_dynamic_ring_5" to "@android:color/system_accent1_400",
         "piko_dynamic_primary" to "@android:color/system_accent1_200",
         "piko_dynamic_primary_pressed" to "@android:color/system_accent1_100",
         "piko_dynamic_primary_container" to "@android:color/system_accent1_800",
@@ -138,7 +170,7 @@ private val materialYouBaseMappings =
         "bds_blue_1" to "@color/piko_dynamic_primary_pressed",
         "bds_blue_2" to "@color/piko_dynamic_primary_container",
         "badge_color" to "@color/piko_dynamic_primary",
-        "igds_prism_indigo_1000" to "@color/piko_dynamic_primary_container",
+        "igds_prism_indigo_1000" to "@color/piko_dynamic_primary",
     )
 
 private val materialYouAccentMappings =
@@ -213,8 +245,17 @@ internal val amoledSurfaceBaselineMappings =
         }
         .mapValues { "@color/bds_black" }
 
-internal val materialYouNamedMappings =
-    materialYouBaseMappings +
+// Story ring gradient, through the piko_ring_* colors the ring style points at (piko-plus).
+internal val materialYouStoryRingMappings =
+    (1..5).associate { "piko_ring_$it" to "@color/piko_dynamic_ring_$it" }
+
+/** Theme attributes moved onto their own colors at patch time, see retargetThemeAttributes (piko-plus). */
+internal val materialYouRetargetedMappings = linkedMapOf<String, String>()
+
+internal val materialYouNamedMappings get() =
+    materialYouRetargetedMappings +
+    materialYouStoryRingMappings +
+        materialYouBaseMappings +
         materialYouAccentMappings +
         materialYouThemeMappings +
         materialYouSurfaceBaselineMappings
@@ -240,6 +281,19 @@ internal fun amoledMaterialYouOverlayMappings(): Map<String, String> =
 internal val amoledSplashMappings =
     mapOf("ig_splash_screen_background" to "@color/bds_black")
 
+/**
+ * Dark greys Instagram uses as fills in dark mode (secondary buttons, cards, dividers, the
+ * highlight ring) but which the shared mappings send to the background colour, where they vanish.
+ * Night only: in light mode the same colours are text and icons (piko-plus).
+ */
+private val materialYouNightFillOverrides =
+    mapOf(
+        "bds_grey_8" to "piko_dynamic_secondary_container",
+        "bds_grey_9" to "piko_dynamic_pressed_background",
+        "bds_grey_11" to "piko_dynamic_outline_variant",
+        "bds_grey_18" to "piko_dynamic_pressed_background",
+    )
+
 internal fun dynamicOverlayMappings(night: Boolean): Map<String, String> {
     val aliases =
         if (night) {
@@ -248,8 +302,8 @@ internal fun dynamicOverlayMappings(night: Boolean): Map<String, String> {
             materialYouLightDynamicAliases + materialYouNeutralConstantsDynamic
         }
 
-    return materialYouNamedMappings.mapValues { (_, value) ->
-        val alias = value.removePrefix("@color/")
+    return materialYouNamedMappings.mapValues { (name, value) ->
+        val alias = materialYouNightFillOverrides[name]?.takeIf { night } ?: value.removePrefix("@color/")
         aliases[alias] ?: value
     }
 }

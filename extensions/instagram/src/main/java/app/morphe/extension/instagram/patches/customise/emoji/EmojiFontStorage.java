@@ -99,8 +99,28 @@ public final class EmojiFontStorage {
         }
     }
 
+    static String describe() {
+        File file = file();
+        return file + " exists=" + file.exists() + " bytes=" + file.length() + " source=" + current();
+    }
+
+    /**
+     * The font as a custom fallback family. Minikin always picks a custom fallback family that has
+     * the glyph; a plain typeface loses emoji to the system emoji font, which is tagged as an emoji
+     * font (und-Zsye) and wins font selection for emoji even inside a span.
+     */
     static Typeface loadTypeface() {
-        return hasFont() ? parse(file()) : null;
+        if (!hasFont()) {
+            return null;
+        }
+        try {
+            android.graphics.fonts.Font font = new android.graphics.fonts.Font.Builder(file()).build();
+            android.graphics.fonts.FontFamily family = new android.graphics.fonts.FontFamily.Builder(font).build();
+            return new Typeface.CustomFallbackBuilder(family).setSystemFallback("sans-serif").build();
+        } catch (Exception e) {
+            Logger.printException(() -> "Failed to load the emoji font as a fallback family", e);
+            return parse(file());
+        }
     }
 
     /** Removes the stored font; the system emoji are back after a restart. */
