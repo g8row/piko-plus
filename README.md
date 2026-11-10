@@ -40,13 +40,7 @@ Starting with patches v3.0.0, Piko patches use [Morphe](https://morphe.software)
 
 ### Morphe Manager
 
-Tap the button to add Piko as a patch source in Morphe Manager:
-
-<a href="https://morphe.software/add-source?github=crimera/piko">
-  <img src="docs/images/add-to-morphe.svg" alt="Add to Morphe" height="36">
-</a>
-
-Then patch Twitter/X or Instagram:
+Add Piko Plus as a patch source with the button at the top of this page, then patch Twitter/X or Instagram:
 1. Tap X or Instagram app icon in Morphe
 2. Download original APKM file from ApkMirror. Do _not_ unspilt or modify the file, Morphe patches APKM directly
 3. Wait for patching to complete, install
