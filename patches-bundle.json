@@ -1,7 +1,7 @@
 {
-  "created_at": "2026-11-10T16:30:13",
-  "description": "First Piko Plus release, based on piko 3.11.1-dev.\n\n### Added\n- **Conversation notifications** for Instagram DMs: Android conversation-style notifications with history, sender names and avatars, inline reply, mark as read and share-sheet shortcuts.\n- **Custom emoji font**: download Apple, Google Noto, Twemoji or Microsoft Fluent emoji from Piko settings > Font.\n- **Material You, extended**: system Settings colours (Material 3 roles on Android 14+), Compose screens, secondary buttons, story rings, note bubbles and dark-mode surfaces.",
-  "download_url": "https://github.com/g8row/piko-plus/releases/download/plus-v1.0.0/patches-1.0.0.mpp",
+  "created_at": "2026-11-10T17:13:56",
+  "description": "Piko Plus 1.1.0",
+  "download_url": "https://github.com/g8row/piko-plus/releases/download/plus-v1.1.0/patches-1.1.0.mpp",
   "signature_download_url": "",
-  "version": "1.0.0"
+  "version": "1.1.0"
 }

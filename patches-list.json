@@ -1,6 +1,6 @@
 {
   "NOTE": "Do NOT manually edit this file. This file is automatically updated when semantic release (release.yml) runs. Manually editing this file can break your releases and break third party tools that use this file.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "patches": [
     {
       "name": "Add ability to copy media link",
@@ -394,7 +394,7 @@
     },
     {
       "name": "Custom emoji font",
-      "description": "Adds an option to download an emoji font (Apple, Noto, Twemoji, Fluent) and draw emoji in it.",
+      "description": "Adds an option to download an emoji font (Apple, Noto, Twemoji, Fluent) or import one and draw emoji in it.",
       "default": true,
       "category": null,
       "compatiblePackages": [
